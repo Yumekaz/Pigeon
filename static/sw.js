@@ -67,7 +67,7 @@ const PRECACHE = [
   '/static/css/documents-gallery-editor.css?v=pigeon2',
   '/static/css/email-calendar-notes-tasks.css?v=pigeon2',
   '/static/css/cookbook-research-memory-settings.css?v=pigeon2',
-  '/static/app.js?v=20260929csssplit',
+  '/static/app.js?v=pigeon2',
   '/static/js/storage.js',
   '/static/js/appConfig.js',
   '/static/js/ui.js?v=20260916largetoolscroll1',

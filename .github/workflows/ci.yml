@@ -124,13 +124,18 @@ jobs:
       # If so, skip the expensive pytest run while still reporting a passing check.
       - name: Check for docs-only changes
         id: docs-check
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-            HEAD="${{ github.event.pull_request.head.sha }}"
+            BASE="$PR_BASE_SHA"
+            HEAD="$PR_HEAD_SHA"
           else
-            BASE="${{ github.event.before }}"
-            HEAD="${{ github.sha }}"
+            BASE="$PUSH_BEFORE_SHA"
+            HEAD="$PUSH_HEAD_SHA"
           fi
           # Keep website/ and assets/branding/ out of this bypass: pytest owns
           # regression guards for their published-file and orphan-asset contracts.

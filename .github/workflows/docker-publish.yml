@@ -63,9 +63,11 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
       - name: Export digest
+        env:
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
+          digest="$BUILD_DIGEST"
           touch "/tmp/digests/${digest#sha256:}"
       - name: Upload digest
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -130,11 +132,14 @@ jobs:
           REGISTRY: ${{ env.REGISTRY }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
       - name: Inspect
+        env:
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
+          RELEASE_SHORT: ${{ steps.ver.outputs.short }}
         run: |
           # main: verify both the mutable :latest and the immutable :X.Y.Z-<sha> prod pin
           #        actually resolved in the registry; dev: verify :dev.
           if [ "$GITHUB_REF" = "refs/heads/main" ]; then
-            refs=("latest" "${{ steps.ver.outputs.version }}-${{ steps.ver.outputs.short }}")
+            refs=("latest" "${RELEASE_VERSION}-${RELEASE_SHORT}")
           else
             refs=("dev")
           fi

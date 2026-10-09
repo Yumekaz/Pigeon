@@ -20,6 +20,7 @@ PUBLIC_GUIDES = {
     "attachments.md",
     "backup-restore.md",
     "configuration-reference.md",
+    "email-outlook.md",
     "setup.md",
 }
 # Files a referenced image name could legitimately appear in.

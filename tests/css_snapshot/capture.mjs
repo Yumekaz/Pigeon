@@ -258,6 +258,15 @@ async function main() {
           javaScriptEnabled: true,
         });
         const tab = await context.newPage();
+        const stylesheetRequestFailures = [];
+        tab.on('response', response => {
+          if (response.request().resourceType() === 'stylesheet' && !response.ok()) {
+            stylesheetRequestFailures.push(response.url());
+          }
+        });
+        tab.on('requestfailed', request => {
+          if (request.resourceType() === 'stylesheet') stylesheetRequestFailures.push(request.url());
+        });
         if (process.env.CSS_SNAPSHOT_PROGRESS) tab.on('console', message => appendFileSync(process.env.CSS_SNAPSHOT_PROGRESS, message.text() + '\n'));
         const cdp = await context.newCDPSession(tab);
         // Pin the UA standard font preference rather than overriding author
@@ -324,6 +333,7 @@ async function main() {
         }
         // A missing stylesheet must fail capture rather than establish an unstyled baseline.
         const styleFailures = await tab.evaluate(() => Array.from(document.querySelectorAll('link[rel="stylesheet"]')).filter(link => !link.sheet).map(link => link.href));
+        styleFailures.push(...stylesheetRequestFailures);
         if (styleFailures.length) throw new Error(`Stylesheets failed to load: ${styleFailures.join(', ')}`);
         if (job.measurementDelayMs) await tab.waitForTimeout(job.measurementDelayMs);
         const result = await tab.evaluate(pageMeasure, {

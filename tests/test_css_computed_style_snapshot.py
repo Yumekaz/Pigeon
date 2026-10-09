@@ -198,3 +198,24 @@ def test_reordering_two_conflicting_declarations_moves_the_digest():
     drift = snapshot.compare(unchanged, reordered)
     assert "app-shell/attach-strip" in drift["elements"]
     assert "bench/.attach-strip" in drift["elements"]
+
+
+@_requires_browser
+def test_capture_rejects_unloaded_stylesheets(tmp_path):
+    """An unstyled page must never become an accepted visual baseline."""
+    (tmp_path / "fixture.html").write_text(
+        '<html><head><link rel="stylesheet" href="missing.css"></head>'
+        '<body><div id="guard">Unstyled</div></body></html>', encoding="utf-8"
+    )
+    inventory = {
+        "properties": ["color"],
+        "variants": [snapshot.load_inventory()["variants"][0]],
+        "pages": [{"name": "fixture", "url": "/fixture.html",
+                   "elements": [{"key": "guard", "selector": "#guard"}]}],
+    }
+    origin, shutdown = snapshot.serve_repository(tmp_path)
+    try:
+        with pytest.raises(RuntimeError, match="Stylesheets failed to load"):
+            snapshot.capture(origin, inventory)
+    finally:
+        shutdown()

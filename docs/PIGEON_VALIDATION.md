@@ -37,10 +37,12 @@ Required attribution and notices were checked against the original files. Ten st
 
 ## CI correction
 
-Remote CI on `bec3feb` exposed 20 failed tests across four shards. A branding replacement had changed the internal `X-Odysseus-Run-Id` header; it is restored for streaming identity, Stop, and resume. Login asset paths now remain relative under reverse-proxy mounts. Every app stylesheet and its service-worker entry share `pigeon2`; the service-worker cache is `pigeon-v3`.
+Remote CI on `bec3feb` exposed 20 failed tests across four shards. A branding replacement had changed the internal `X-Odysseus-Run-Id` header; it is restored for streaming identity, Stop, and resume. Login asset paths now remain relative under reverse-proxy mounts. The app entry, every app stylesheet, and their service-worker entries share `pigeon2`; the service-worker cache is `pigeon-v3`.
 
 The earlier computed-style baseline had unstyled browser defaults, so its reported design coverage is withdrawn. The harness now supplies frozen stylesheet sources on every capture and rejects any unloaded stylesheet. The replacement raw capture is retained locally; Linux CI also retains raw computed values to diagnose platform differences.
 
-Public-document inventory checks now cover the four published guides, rather than requiring internal migration/audit notes. Product-label assertions and the issue checker match PIGEON, while the checker still accepts the historical revision heading. The generated configuration reference and README authentication guidance are synchronized.
+Public-document inventory checks now cover the published guides, rather than requiring internal migration/audit notes. Product-label assertions and the issue checker match PIGEON, while the checker still accepts the historical revision heading. The generated configuration reference and README authentication guidance are synchronized.
 
 This private repository cannot use GitHub CodeQL without the required entitlement. At the owner's request, CodeQL is replaced by Semgrep Community Edition for first-party Python/JavaScript; the existing actionlint/zizmor workflow continues auditing Actions. Semgrep runs with metrics disabled and fails on ERROR-level findings or configuration/scanner errors. Findings remain downloadable in Actions artifacts. This is different analysis coverage, not a claim of CodeQL equivalence.
+
+The corrected combined affected suite passed 119 tests locally. A separate cache/editor integration group passed 29 tests, and the missing-stylesheet rejection test passed. The first corrected Linux CI run passed the full computed-style comparison and streaming regressions; five remaining failures were cache-entry identity assertions, the cache namespace assertion, and an unpublished Outlook guide link. Those contracts and the public guide are now synchronized. Workflow output values pass through environment variables so strict Semgrep parsing can audit their shell scripts.

@@ -89,7 +89,7 @@
     s.setProperty('--bg-effect-size', String(effSize));
     // Stash so the deferred module knows which canvas effect to start.
     window.__loginBgPattern = pattern;
-    // Apply the body class as soon as <body> exists so static-gradient
+    // Apply the body class as soon as <body class="pigeon-login"> exists so static-gradient
     // patterns (dots, synapse) paint immediately on first frame.
     var apply = function() { document.body.classList.add('bg-pattern-' + pattern); };
     if (document.body) apply();

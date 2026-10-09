@@ -11,7 +11,7 @@ the codebase, you are probably right to stay away.
 - Fresh install smoke tests on Linux, macOS, and Windows. Docker, native Python,
   and WSL all need coverage.
 
-- Integration audit: do integrations even work? Confirm what works, what needs setup docs, and what should be removed or hidden. 
+- Integration audit: do integrations even work? Confirm what works, what needs setup docs, and what should be removed or hidden.
 - Cookbook reliability on other computers. This is probably the area most likely to need work across different machines, GPUs, drivers, shells, and Python environments.
 - Cookbook SGLang support across platforms. Make sure SGLang setup/serve works
   predictably on Linux, Windows/WSL, macOS where possible, Docker, and common

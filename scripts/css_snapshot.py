@@ -205,6 +205,8 @@ def serve_repository(root=ROOT):
     root = Path(root).resolve()
 
     class Handler(http.server.SimpleHTTPRequestHandler):
+        protocol_version = 'HTTP/1.1'
+
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(root), **kwargs)
 

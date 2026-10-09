@@ -135,6 +135,8 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.ver.outputs.version }}
           RELEASE_SHORT: ${{ steps.ver.outputs.short }}
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
         run: |
           # main: verify both the mutable :latest and the immutable :X.Y.Z-<sha> prod pin
           #        actually resolved in the registry; dev: verify :dev.
@@ -146,6 +148,3 @@ jobs:
           for ref in "${refs[@]}"; do
             docker buildx imagetools inspect "${REGISTRY}/${IMAGE_NAME}:${ref}"
           done
-        env:
-          REGISTRY: ${{ env.REGISTRY }}
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}

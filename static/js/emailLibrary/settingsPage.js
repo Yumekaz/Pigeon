@@ -168,9 +168,12 @@ async function _findAutoReplyCalendarEventUids(cfg, accountId) {
     });
     if (!response.ok) return [];
     const data = await response.json().catch(() => ({}));
-    const marker = `PIGEON email auto reply - account:${String(accountId || '')}`;
+    // Existing calendar entries retain their historical description until updated.
+    const markers = ['PIGEON', 'Odysseus'].map(brand =>
+      `${brand} email auto reply - account:${String(accountId || '')}`);
+
     return (data.events || [])
-      .filter(ev => String(ev?.description || '').startsWith(marker))
+      .filter(ev => markers.some(marker => String(ev?.description || '').startsWith(marker)))
       .map(ev => String(ev?.uid || '').trim())
       .filter(Boolean);
   } catch (_) {

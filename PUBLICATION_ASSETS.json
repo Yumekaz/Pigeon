@@ -1,0 +1,74 @@
+{
+  "product": "PIGEON",
+  "master_preserved": true,
+  "brand_assets": [
+    {
+      "path": "static/branding/pigeon-master.png",
+      "sha256": "851196c51b868c8978bfb1d85ff26b04a3dbffed7765649c80feb68bc4866ff3"
+    },
+    {
+      "path": "static/branding/pigeon-bird.png",
+      "sha256": "6598a940bb2b662ef221613f7868ecf04a7c3f07605bec8aa63da74a2dbf7581"
+    },
+    {
+      "path": "static/branding/pigeon-wordmark.png",
+      "sha256": "af4ef65f9360596abf95ec76f915e6ee680b1f771febca1b73a2297958de3421"
+    },
+    {
+      "path": "static/icons/icon-32.png",
+      "sha256": "c5728828999742612f7dd3b8504467ba5e86b7f195336343c731f61297a3d0fb"
+    },
+    {
+      "path": "static/icons/icon-192.png",
+      "sha256": "00d8e531f26f7c4b703a39ff561466db6722b8cbedd275eb44aca4ccf03f766a"
+    },
+    {
+      "path": "static/icons/icon-512.png",
+      "sha256": "fb9153bcf2b56dacf7c12c214f70eca1dd8bce09ea0e0f67f76ba952d4d7abf9"
+    },
+    {
+      "path": "static/icons/icon-maskable-512.png",
+      "sha256": "b769c126b8cf17cd9b6a42f086bff7642f4ccd789f5558add80a7468adfa0210"
+    },
+    {
+      "path": "static/icon.ico",
+      "sha256": "8e19d91c371db5c664896546b18fc7600fa7bedb608c0b470e430ca79d95fa1d"
+    },
+    {
+      "path": "assets/branding/pigeon-bird.png",
+      "sha256": "6598a940bb2b662ef221613f7868ecf04a7c3f07605bec8aa63da74a2dbf7581"
+    },
+    {
+      "path": "assets/branding/pigeon-wordmark.png",
+      "sha256": "af4ef65f9360596abf95ec76f915e6ee680b1f771febca1b73a2297958de3421"
+    },
+    {
+      "path": "assets/branding/pigeon-workspace.png",
+      "sha256": "1118d80c5a6ad3789ee6e7bc5c9df097ce0359c63bcb723e21f270d1cc49864e"
+    },
+    {
+      "path": "website/assets/pigeon-bird.png",
+      "sha256": "6598a940bb2b662ef221613f7868ecf04a7c3f07605bec8aa63da74a2dbf7581"
+    },
+    {
+      "path": "website/assets/pigeon-workspace.png",
+      "sha256": "1118d80c5a6ad3789ee6e7bc5c9df097ce0359c63bcb723e21f270d1cc49864e"
+    }
+  ],
+  "omitted_resources": [
+    "static/fonts/GohuFont.ttf",
+    "static/lib/html2pdf.bundle.min.js",
+    "static/lib/qrcode.min.js",
+    "static/icons/ollama-mark.png",
+    "static/icons/ollama-mark-crop.png",
+    "static/icons/sglang-logo.png",
+    "static/icons/sglang-mark.png"
+  ],
+  "omitted_design_experiments": [
+    "modal-control-variants.html",
+    "research-ascii-variants.html",
+    "research-ascii-variants.js",
+    "wave-variants.html",
+    "whirlpool-variants.html"
+  ]
+}

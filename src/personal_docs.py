@@ -312,6 +312,10 @@ class PersonalDocsManager:
             self.refresh_index()
         else:
             logger.info(f"Directory already indexed: {directory}")
+            # A subsequent upload adds a new file to the same tracked owner
+            # directory. Refresh the file inventory even when no new
+            # directory needs recording; do not re-embed owner-stamped chunks.
+            self.refresh_index()
 
     def remove_directory(self, directory: str):
         """Remove a directory from the tracking list."""

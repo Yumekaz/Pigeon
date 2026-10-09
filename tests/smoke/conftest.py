@@ -150,6 +150,7 @@ def stub_endpoint(client, stub_provider) -> str:
         "name": "odysseus-smoke-stub",
         "base_url": stub_provider.base_url,
         "endpoint_kind": "local",
+        "supports_tools": "true",
     })
     if response.status_code != 200:
         pytest.skip(

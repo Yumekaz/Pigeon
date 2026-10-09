@@ -86,7 +86,9 @@ def _write_file_digest(execution_input: str, path: str) -> str:
     except (TypeError, ValueError):
         return ""
     body = args.get("content") if isinstance(args, dict) else None
-    if not isinstance(body, str) or os.linesep != "\n":
+    # WriteFileTool commits UTF-8 with newline="" on every platform. Its
+    # exact requested bytes can therefore be verified on Windows as well.
+    if not isinstance(body, str):
         return ""
     return hashlib.sha256(_unwrap_fenced_source_body(body, path).encode("utf-8")).hexdigest()
 

@@ -249,3 +249,17 @@ def test_marquee_is_wired_through_editor_and_offline_graph():
     assert "/static/js/editor/tools/marquee.js" in service_worker
     assert 'data-selection-action="transform"' in (ROOT / "static/js/editor/build/topbar.js").read_text(encoding="utf-8")
     assert re.search(r"const CACHE_NAME = 'pigeon-v\d+';", service_worker)
+
+
+def test_constrained_marquee_snaps_fractional_pointer_origins_to_pixels():
+    result = run_node("""
+      const fixed = normalizeConstrainedSelectionRect(
+        {x:239.999,y:179.75},{x:239.999,y:179.75},400,400,
+        {mode:'size',fixedWidth:80,fixedHeight:60});
+      const ratio = normalizeConstrainedSelectionRect(
+        {x:31.75,y:23.75},{x:192,y:72},320,240,
+        {mode:'ratio',ratioWidth:4,ratioHeight:3});
+      console.log(JSON.stringify({fixed,ratio}));
+    """)
+    assert result["fixed"] == {"x": 240, "y": 180, "w": 80, "h": 60}
+    assert result["ratio"] == {"x": 32, "y": 24, "w": 160, "h": 120}

@@ -21,6 +21,21 @@ ACTIONS = dict(re.findall(r"\s+(\w+): '([^']+)'", MENU))
 
 
 @pytest.mark.parametrize('action', ['proofread', 'improve', 'concise', 'style', 'sources'])
+def test_writing_menu_authority_matches_bound_editor_tools(action):
+    from src.agent_runtime.authority import create_request_authority, ExactOperation
+    authority = create_request_authority(ACTIONS[action], owner='alice', session_id='s', active_document=True)
+    tool = 'edit_document' if action == 'proofread' else 'suggest_document'
+    assert authority.permits(ExactOperation.normalize(tool, '{}'))
+    assert not authority.permits(ExactOperation.normalize('bash', 'whoami'))
+
+
+def test_concise_menu_html_tags_are_not_a_new_code_artifact():
+    from src.turn_contract import standalone_code_request
+    assert not standalone_code_request(ACTIONS['concise'])
+    assert standalone_code_request('Create a simple HTML website')
+
+
+@pytest.mark.parametrize('action', ['proofread', 'improve', 'concise', 'style', 'sources'])
 @pytest.mark.parametrize('newline', ['\n', '\r\n'])
 def test_writing_actions_keep_inline_tools_despite_source_topics(action, newline):
     prompt = ACTIONS[action] + '\n\nUse this configured writing style as the source of truth:\n---\nUse clear sentences about files and tasks.\n---'

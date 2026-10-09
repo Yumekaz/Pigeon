@@ -331,11 +331,14 @@ function _wireToastSwipe(el) {
  * Show success toast message
  */
 export function showToast(msg, durationOrOpts) {
-  fetch('/api/tasks/notification-logs', {
-    method: 'POST', credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ body: String(msg || ''), status: 'success' }),
-  }).catch(() => {});
+  // Optional history requires a signed-in user; anonymous toasts stay local.
+  if (window._isAuthenticated === true) {
+    fetch('/api/tasks/notification-logs', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: String(msg || ''), status: 'success' }),
+    }).catch(() => {});
+  }
   if (!toastEl) {
     toastEl = document.getElementById('toast');
   }
@@ -462,11 +465,14 @@ export function showToast(msg, durationOrOpts) {
  * Show error toast message
  */
 export function showError(msg) {
-  fetch('/api/tasks/notification-logs', {
-    method: 'POST', credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ body: String(msg || ''), status: 'error' }),
-  }).catch(() => {});
+  // Optional history requires a signed-in user; anonymous toasts stay local.
+  if (window._isAuthenticated === true) {
+    fetch('/api/tasks/notification-logs', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: String(msg || ''), status: 'error' }),
+    }).catch(() => {});
+  }
   if (!toastEl) {
     toastEl = document.getElementById('toast');
   }

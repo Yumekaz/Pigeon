@@ -105,7 +105,7 @@ def target():
 
 
 def _seed(path, text=RECIPE):
-    with open(path, "w", encoding="utf-8") as handle:
+    with open(path, "w", encoding="utf-8", newline="") as handle:
         handle.write(text)
     return text
 
@@ -204,6 +204,7 @@ async def test_refusal_names_the_byte_count_and_the_explicit_form(target):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(os.name == 'nt', reason='Windows filenames cannot contain double quotes')
 async def test_refusal_suggestion_is_valid_json_for_paths_with_quotes(target):
     quoted_path = os.path.join(os.path.dirname(target), 'recipe"draft.md')
     _seed(quoted_path)
@@ -360,6 +361,15 @@ async def test_a_real_body_still_writes_and_reports_a_diff(target):
     assert res["exit_code"] == 0, res
     assert _read(target) == replacement
     assert res["diff"]["added"] == 1 and res["diff"]["removed"] == 1
+
+
+@pytest.mark.asyncio
+async def test_write_preserves_the_exact_requested_newline_bytes(target):
+    body = 'First\r\nSecond\n'
+    result = await WriteFileTool().execute(json.dumps({'path': target, 'content': body}), {})
+    assert result['exit_code'] == 0, result
+    with open(target, 'rb') as handle:
+        assert handle.read() == body.encode('utf-8')
 
 
 @pytest.mark.asyncio

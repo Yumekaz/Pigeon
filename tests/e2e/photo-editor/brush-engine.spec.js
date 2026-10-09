@@ -41,12 +41,28 @@ test('long sampled strokes stay responsive and undo atomically', async ({ page }
   const before = await flattenedPixelDigest(page);
   const start = await canvasPoint(page, 0.08, 0.5);
   const end = await canvasPoint(page, 0.92, 0.5);
-  const startedAt = Date.now();
-  await page.mouse.move(start.x, start.y);
-  await page.mouse.down();
-  await page.mouse.move(end.x, end.y, { steps: 240 });
-  await page.mouse.up();
-  expect(Date.now() - startedAt).toBeLessThan(5000);
+  // Measure production browser event processing, not 240 cross-process
+  // Playwright input round trips (which vary with host/trace overhead).
+  const processingMs = await page.evaluate(async ({ start, end }) => {
+    const canvas = document.querySelector('.ge-main-canvas');
+    const startedAt = performance.now();
+    const event = (type, x, y, buttons) => new MouseEvent(type, {
+      bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons,
+    });
+    canvas.dispatchEvent(event('mousedown', start.x, start.y, 1));
+    for (let i = 1; i <= 240; i += 1) {
+      window.dispatchEvent(event('mousemove', start.x + (end.x - start.x) * i / 240,
+        start.y + (end.y - start.y) * i / 240, 1));
+    }
+    window.dispatchEvent(event('mouseup', end.x, end.y, 0));
+    await new Promise(requestAnimationFrame);
+    return performance.now() - startedAt;
+  }, { start, end });
+  await test.info().attach('stroke-processing', {
+    body: Buffer.from(JSON.stringify({ samples: 240, processingMs, limitMs: 5000 })),
+    contentType: 'application/json',
+  });
+  expect(processingMs).toBeLessThan(5000);
   const after = await flattenedPixelDigest(page);
   expect(after).not.toEqual(before);
   await expect(thumb).toHaveAttribute('width', '68');

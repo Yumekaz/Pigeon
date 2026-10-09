@@ -8444,7 +8444,7 @@ def _agent_route_tool_mode(
         logger.debug("endpoint supports_tools lookup failed: %s", exc)
 
     model_supports_tools = any(kw in model_lc for kw in (
-        "gpt-4", "gpt-5", "gpt-o", "claude", "gemini", "gemma",
+        "gpt-4", "gpt-5", "gpt-6", "gpt-o", "claude", "gemini", "gemma",
         "qwen3", "qwen35", "qwen2.5", "mixtral", "mistral", "llama-3.1", "llama-3.2",
         "llama-3.3", "llama-4", "llama3.1", "llama3.2", "llama3.3", "llama4",
         "minimax", "kimi", "yi-", "phi-3", "phi-4", "command-r",
@@ -22258,6 +22258,10 @@ async def stream_agent_loop(
                         continue
                     yield chunk
                 elif chunk.startswith("event: error"):
+                    if _local_budget_stream_message(chunk):
+                        yield chunk
+                        yield f'data: {json.dumps({"type": "final_response", "content": _local_budget_stream_message(chunk)})}\n\n'
+                        return
                     if _casual_low_signal_turn and not _is_teacher_run:
                         direct_response = "Hi. How can I help?"
                         break
@@ -24224,6 +24228,19 @@ async def stream_agent_loop(
                 "deliberation. If search evidence is weak, refine the query once, then use "
                 "fetch/browser if needed. Respect permissions and do not claim unexecuted actions."
             )}, *[m for m in clean_source if m.get("role") != "system"]]
+            if _prompt_active_document is not None:
+                # The full-tool route rebuilds its prompt from clean history,
+                # which deliberately removes earlier injected context. Restore
+                # the verified visible editor as source data for this round.
+                # Its text must never become a system instruction.
+                editor_context = untrusted_context_message(
+                    "active editor document",
+                    f'Title: {_prompt_active_document.title}\n'
+                    f'Language: {_prompt_active_document.language or "text"}\n'
+                    f'Content (verbatim):\n{_prompt_active_document.current_content or ""}',
+                )
+                editor_context["_agent_injected"] = "context"
+                route_messages.insert(max(1, len(route_messages) - 1), editor_context)
             route_mcp_schemas = []
         elif normalized_external_tool_schemas:
             # Reasoning-parser models need the private reasoning attached to
@@ -25464,6 +25481,16 @@ async def stream_agent_loop(
             or approved_result.get("error")
             or "(no output)"
         )
+        if approved_result.get("action") == "suggest" and approved_result.get("suggestions"):
+            # The suggestion handler returns structured UI data, not stdout.
+            # Report its committed result to the model instead of '(no output)',
+            # which otherwise invites duplicate suggestions after approval.
+            approved_output = (
+                f"Created {len(approved_result['suggestions'])} inline suggestions "
+                f"for document {approved_result.get('doc_id', '')}. "
+                "They are saved for user review; the document content is unchanged. "
+                "Do not recreate these suggestions."
+            )
         if (
             approved.tool_name == "manage_memory"
             and _approved_action in {"list", "index"}
@@ -25656,15 +25683,20 @@ async def stream_agent_loop(
                 or (approved.tool_name == "manage_skills" and _approved_action in {"add", "edit", "patch", "publish", "delete", "remove"})
                 or (approved.tool_name == "manage_memory" and _approved_action in {"add", "edit", "update", "delete", "delete_all"})
                 or (approved.tool_name in {"create_document", "edit_document", "update_document"})
+                or (approved.tool_name == "suggest_document" and approved_result.get("action") == "suggest"
+                    and bool(approved_result.get("suggestions")))
             )
         )
         if _approved_effectful:
-            full_response = "Done."
+            full_response = (
+                f"Added {len(approved_result['suggestions'])} inline suggestions. The document is unchanged."
+                if approved.tool_name == "suggest_document" else "Done."
+            )
             # The approval question was streamed on the original request and
             # is already rendered as its own approval card. On the approval
             # continuation replace that draft instead of appending
             # "Done." to it (which produced "Allow ...?Done.").
-            yield 'data: ' + json.dumps({"type": "final_response", "content": "Done."}) + "\n\n"
+            yield 'data: ' + json.dumps({"type": "final_response", "content": full_response}) + "\n\n"
             _approved_effectful_completed = True
             _approved_result_injected = True
         _approved_terminal_summary = ""
@@ -26131,6 +26163,29 @@ async def stream_agent_loop(
                     candidate_model,
                     state["messages"],
                 )
+            if _prompt_active_document is not None:
+                editor_text = _prompt_active_document.current_content or ""
+                if editor_text and not any(
+                    (item.get("metadata") or {}).get("source") == "active editor document"
+                    or editor_text in _message_content_text(item)
+                    for item in request_messages
+                ):
+                    # Candidate shaping/compaction may discard injected source
+                    # messages. A bound editor must still be visible to the
+                    # provider; restore it as untrusted data, never authority.
+                    editor_context = untrusted_context_message(
+                        "active editor document",
+                        f'Title: {_prompt_active_document.title}\n'
+                        f'Language: {_prompt_active_document.language or "text"}\n'
+                        f'Content (verbatim):\n{editor_text}',
+                    )
+                    request_messages = list(request_messages)
+                    request_index = next((
+                        i for i in range(len(request_messages) - 1, -1, -1)
+                        if request_messages[i].get("role") == "user"
+                        and (request_messages[i].get("metadata") or {}).get("trusted") is not False
+                    ), len(request_messages))
+                    request_messages.insert(request_index, editor_context)
             deepseek_visual_messages = None
             if _is_deepseek_flash_vision_model(candidate_model):
                 deepseek_visual_messages = _deepseek_flash_visual_continuation(
@@ -26934,6 +26989,10 @@ async def stream_agent_loop(
                 break
             # Forward error events from stream_llm to the frontend
             if chunk.startswith("event: error"):
+                if _local_budget_stream_message(chunk):
+                    yield chunk
+                    yield f'data: {json.dumps({"type": "final_response", "content": _local_budget_stream_message(chunk)})}\n\n'
+                    return
                 logger.warning(
                     "[agent-timing] stream_error round=%s elapsed=%.3fs chunk=%r",
                     round_num,
@@ -38022,3 +38081,16 @@ async def stream_agent_loop(
         )
 
     yield "data: [DONE]\n\n"
+
+
+def _local_budget_stream_message(chunk: str) -> str:
+    """Keep local allowance blocks distinct from upstream provider failures."""
+    for line in chunk.splitlines():
+        if line.startswith("data: "):
+            try:
+                payload = json.loads(line[6:])
+                if payload.get("origin") == "pigeon_budget_guard":
+                    return str(payload.get("text") or "PIGEON local test budget blocked this request.")
+            except (ValueError, TypeError, AttributeError):
+                pass
+    return ""

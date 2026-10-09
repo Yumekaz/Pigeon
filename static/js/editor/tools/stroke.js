@@ -59,7 +59,7 @@ function eventSample(e) {
 export function createStrokeTool({
   saveState, undo, beginStroke, strokeTo, endStroke, composite,
   getActiveMaskLayer, activeParentLayer, ensureActiveMaskLayer, createLayer,
-  renderLayerPanel, syncToolClearIndicators, showToast,
+  renderLayerPanel, syncToolClearIndicators, showToast, schedulePersist,
 }) {
   return {
     /**
@@ -151,6 +151,9 @@ export function createStrokeTool({
       // so inline layer/group thumbnails reflect the completed edit.
       renderLayerPanel();
       if (wasDrawingInpaint) syncToolClearIndicators();
+      // The undo snapshot is taken at pointerdown. A long stroke can outlast
+      // that autosave, so persist the completed pixels again at pointerup.
+      schedulePersist?.();
       return true;
     },
 

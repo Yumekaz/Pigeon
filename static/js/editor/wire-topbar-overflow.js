@@ -45,16 +45,24 @@ export function wireTopbarOverflow({ container }) {
     menu.setAttribute('popover', 'manual');
     const position = () => {
       const rect = anchor.getBoundingClientRect();
+      // Popovers render in the viewport's top layer. An anchor near the
+      // left edge cannot right-align a wider menu without clipping it.
+      menu.style.translate = '';
       menu.style.top = `${rect.bottom + 4}px`;
-      menu.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+      const width = menu.getBoundingClientRect().width;
+      const right = Math.min(
+        Math.max(8, window.innerWidth - rect.right),
+        Math.max(8, window.innerWidth - width - 8),
+      );
+      menu.style.right = `${right}px`;
       menu.style.left = 'auto';
     };
     const sync = () => {
       if (menu.hidden) {
         if (menu.matches(':popover-open')) menu.hidePopover();
       } else if (menu.isConnected) {
-        position();
         if (!menu.matches(':popover-open')) menu.showPopover();
+        position();
       }
     };
     const observer = new MutationObserver(sync);

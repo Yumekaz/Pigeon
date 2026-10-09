@@ -37,7 +37,7 @@ test('group retained effects edit, toggle, reorder surface, and survive reopen',
   const groupId = (await editorState(page)).groups[0].id;
   const groupRow = page.locator(`.ge-layer-group-row[data-group-id="${groupId}"]`);
 
-  await page.locator('.ge-layer-item:is(.active, .active-parent) .ge-layer-btn[title*="effect"]').click();
+  await page.locator('.ge-layer-group-row.active .ge-layer-btn[title*="effect"]').click();
   await page.locator('[data-filter-action="effect-blur-gaussian"]').click();
   await expect(page.locator('.ge-filter-modal')).toBeVisible();
   await page.locator('.ge-filter-row input[data-key="radius"]').fill('14');
@@ -83,7 +83,7 @@ test('group retained effects export the visible composite and survive reopen', a
   await page.locator('.ge-layer-item[data-layer-id]').filter({ hasText: 'Background' }).first().click({ modifiers: ['Control'] });
   await page.locator('#ge-group-selected').click();
 
-  await page.locator('.ge-layer-item:is(.active, .active-parent) .ge-layer-btn[title*="effect"]').click();
+  await page.locator('.ge-layer-group-row.active .ge-layer-btn[title*="effect"]').click();
   await page.locator('[data-filter-action="effect-color-overlay"]').click();
   await expect(page.locator('.ge-filter-modal')).toBeVisible();
   await page.locator('.ge-filter-row input[type="color"]').fill('#336699');

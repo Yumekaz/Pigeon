@@ -1343,6 +1343,7 @@ function initializeEventListeners() {
   fetch(`${API_BASE}/api/auth/status`, { credentials: 'same-origin' })
     .then(r => r.json())
     .then(d => {
+      window._isAuthenticated = d.authenticated === true;
       window._isAdmin = !!d.is_admin;
       if (d.is_admin && userBarAdmin) userBarAdmin.style.display = '';
       const userBarName = el('user-bar-name');

@@ -9,8 +9,8 @@ import {spawn, execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {expectedNoteTitles} from './note_test_oracle.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
-const upstream = process.env.ENDPOINT_URL || (() => { throw new Error("ENDPOINT_URL is required"); })();
+const root = fileURLToPath(new URL('..', import.meta.url));
+const upstream = process.env.ENDPOINT_URL;
 const hash = value => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const userText = body => body.messages.findLast(m=>m.role==='user')?.content;
 const titleNorm = s => String(s || '').trim().toLowerCase().replace(/^reminder\s*:\s*/, '').replace(/\s+/g,' ');
@@ -148,6 +148,7 @@ async function completion(body) {
 }
 
 async function main() {
+  if (!upstream) throw new Error('ENDPOINT_URL is required');
   const stamp=new Date().toISOString().replace(/[:.]/g,'-');
   const formatting=process.env.EXPERIMENT==='result_format';
   const prefix=formatting?'result-format':'schema-thinking';

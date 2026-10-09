@@ -15,13 +15,14 @@ lock on the file, merges every durable record other writers appended, allocates
 the next position from that merged tail, checks the record against the merged
 history, then appends and fsyncs before releasing the lock. Positions therefore
 stay unique and a settled outcome is never appended twice. Cross-process
-exclusion relies on POSIX ``flock``; directory fsync relies on POSIX directory
-semantics. Neither is claimed where the platform does not provide it.
+exclusion uses POSIX ``flock`` or Windows byte-range locks. Directory fsync
+relies on POSIX directory semantics and is not claimed on Windows.
 """
 from __future__ import annotations
 
 from contextlib import contextmanager
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -30,10 +31,24 @@ import threading
 import weakref
 from typing import Any, Callable
 
-try:  # POSIX only; elsewhere exclusion is per process.
+try:  # POSIX advisory file locking.
     import fcntl
 except ImportError:  # pragma: no cover - non-POSIX hosts
     fcntl = None
+
+if os.name == "nt":
+    import msvcrt
+else:
+    msvcrt = None
+
+
+def _lock_descriptor(descriptor: int, *, exclusive: bool) -> None:
+    """Serialize independent journal writers on POSIX and Windows."""
+    if fcntl is not None:
+        fcntl.flock(descriptor, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+    elif msvcrt is not None:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_LOCK if exclusive else msvcrt.LK_RLCK, 1)
 
 from src.constants import DATA_DIR
 from src.agent_runtime.effects import (
@@ -243,11 +258,11 @@ class EffectLog:
         """Hold the file exclusively with every durable record merged."""
         assert self.path is not None
         _ensure_directory(self.path.parent)
-        flags = os.O_RDWR | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        flags = (os.O_RDWR | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+                 | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_BINARY", 0))
         descriptor = os.open(self.path, flags, 0o600)
         try:
-            if fcntl is not None:
-                fcntl.flock(descriptor, fcntl.LOCK_EX)
+            _lock_descriptor(descriptor, exclusive=True)
             self._read_tail(descriptor, repair=True)
             self._descriptor = descriptor
             yield
@@ -319,6 +334,7 @@ class EffectLog:
                     return record
             except (OSError, ValueError) as error:
                 if required:
+                    logging.getLogger(__name__).warning("Effect journal claim persistence failed: %s", error)
                     raise EffectPersistenceError("Effect claim could not be persisted durably") from error
                 self.degraded = True
                 # The lock or tail could not be taken: keep this process
@@ -358,15 +374,14 @@ class EffectLog:
         with self._lock:
             try:
                 descriptor = os.open(self.path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-                                     | getattr(os, "O_CLOEXEC", 0))
+                                     | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_BINARY", 0))
             except FileNotFoundError:
                 return
             except OSError:
                 self.degraded = True
                 return
             try:
-                if fcntl is not None:
-                    fcntl.flock(descriptor, fcntl.LOCK_SH)
+                _lock_descriptor(descriptor, exclusive=False)
                 self._read_tail(descriptor, repair=False)
             except OSError:
                 self.degraded = True
@@ -394,14 +409,13 @@ class EffectLog:
         log = cls(run_id, directory=directory)
         assert log.path is not None
         try:
-            descriptor = os.open(log.path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+            descriptor = os.open(log.path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_BINARY", 0))
         except FileNotFoundError:
             return log
         except OSError as error:
             raise EffectPersistenceError("Effect log is unreadable") from error
         try:
-            if fcntl is not None:
-                fcntl.flock(descriptor, fcntl.LOCK_SH)
+            _lock_descriptor(descriptor, exclusive=False)
             info = os.fstat(descriptor)
             if info.st_nlink != 1 or not stat.S_ISREG(info.st_mode):
                 raise EffectPersistenceError("Effect log is aliased")
@@ -460,7 +474,8 @@ class EffectLog:
         temporary = target.with_suffix(".tmp")
         data = json.dumps({"run_id": self.run_id, "effect_id": effect_id}, sort_keys=True).encode()
         _ensure_directory(target.parent)
-        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        flags = (os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+                 | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_BINARY", 0))
         descriptor = os.open(temporary, flags, 0o600)
         try:
             view = memoryview(data)
@@ -478,7 +493,7 @@ class EffectLog:
             return None
         base = Path(directory) if directory is not None else effects_dir()
         try:
-            descriptor = os.open(base / f"launch-{generation}.json", os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            descriptor = os.open(base / f"launch-{generation}.json", os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
             with os.fdopen(descriptor, "rb") as stream:
                 if os.fstat(stream.fileno()).st_nlink != 1:
                     return None

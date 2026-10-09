@@ -40,6 +40,20 @@
  *   imageSizePrompt:     () => Promise<void>,
  * }}
  */
+function keepMenuInViewport(menu) {
+  // The popover manager positions top-layer menus after opening them.
+  if (menu.hasAttribute('popover')) return;
+  menu.style.translate = '';
+  if (window.innerWidth > 820) return;
+  const rect = menu.getBoundingClientRect();
+  const offset = rect.left < 8 ? 8 - rect.left
+    : rect.right > window.innerWidth - 8 ? window.innerWidth - 8 - rect.right : 0;
+  // Dialog zoom/entry transforms scale CSS translations. Convert the
+  // viewport correction back into the menu's local coordinate space.
+  const scale = menu.offsetWidth ? rect.width / menu.offsetWidth : 1;
+  menu.style.translate = `${offset / (scale || 1)}px 0`;
+}
+
 import { state } from './state.js';
 import { resizeCanvasDocument, resizeImageDocument } from './document-geometry.js';
 
@@ -126,6 +140,7 @@ export function wireTopbarMenus({
         const willOpen = menu.hidden;
         if (willOpen) closeOtherTopbarMenus('ge-image-menu');
         menu.hidden = !menu.hidden;
+        if (!menu.hidden) keepMenuInViewport(menu);
       });
       menu.addEventListener('click', (e) => {
         const item = e.target.closest('[data-image-action]');
@@ -203,6 +218,7 @@ export function wireTopbarMenus({
           renderSelectionMenu();
         }
         menu.hidden = !menu.hidden;
+        if (!menu.hidden) keepMenuInViewport(menu);
       });
       menu.addEventListener('click', event => {
         const item = event.target.closest('[data-selection-action]');
@@ -247,6 +263,7 @@ export function wireTopbarMenus({
         const willOpen = menu.hidden;
         if (willOpen) closeOtherTopbarMenus('ge-filter-menu');
         menu.hidden = !menu.hidden;
+        if (!menu.hidden) keepMenuInViewport(menu);
       });
       menu.addEventListener('click', (e) => {
         const item = e.target.closest('[data-filter-action]');
@@ -281,6 +298,7 @@ export function wireTopbarMenus({
         const willOpen = menu.hidden;
         if (willOpen) closeOtherTopbarMenus('ge-resize-menu');
         menu.hidden = !menu.hidden;
+        if (!menu.hidden) keepMenuInViewport(menu);
       });
       menu.querySelectorAll('[data-resize-w]').forEach(item => {
         item.addEventListener('click', () => {

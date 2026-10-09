@@ -126,7 +126,7 @@ test('tool keys never delete a selection and Ctrl J copies only selected pixels'
 test('Shift Alt intersects a marquee and reopening does not duplicate shortcuts', async ({ page }) => {
   await openBlankEditor(page, { width: 320, height: 240 });
   await page.evaluate(async () => {
-    const editor = await import('/static/js/galleryEditor.js');
+    const editor = await window.__photoEditorImport('/static/js/galleryEditor.js');
     await editor.openEditor(null, null, { w: 320, h: 240 }, 'Reopened');
   });
   await page.keyboard.press('m');

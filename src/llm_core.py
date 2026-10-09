@@ -1374,9 +1374,9 @@ def _is_openai_hosted_chat_url(url: str) -> bool:
 
 
 def _model_disallows_reasoning_effort_with_chat_tools(model: str) -> bool:
-    """OpenAI GPT 5.x variants reject reasoning_effort + tools on chat completions."""
+    """OpenAI GPT 5.x and GPT-6 Luna chat tools require reasoning effort none."""
     m = (model or "").strip().lower()
-    return bool(re.match(r"^(?:openai/)?gpt-5(?:[.\-]\d+)?(?:[-_:].*)?$", m))
+    return bool(re.match(r"^(?:openai/)?gpt-5(?:[.\-]\d+)?(?:[-_:].*)?$", m)) or m in {"gpt-6-luna", "openai/gpt-6-luna"}
 
 
 # gpt-oss (harmony) ships BUILT-IN tools named `python` and `browser`, invoked
@@ -1594,12 +1594,37 @@ def _format_chatgpt_subscription_error(status_code: int, text: str) -> str:
     return _format_upstream_error(status_code, text, "https://chatgpt.com/backend-api/codex")
 
 
+def _local_budget_error(body: bytes | str, url: str) -> dict | None:
+    """Recognize the loopback test guard, without relabeling provider errors."""
+    from urllib.parse import urlsplit
+    if urlsplit(url).hostname not in {"127.0.0.1", "localhost", "::1"}:
+        return None
+    try:
+        value = json.loads(body).get("error", {})
+        if value.get("type") == "pigeon_budget_block" and value.get("origin") == "pigeon_budget_guard":
+            return value
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return None
+
+
+def _upstream_error_payload(status: int, body: bytes | str, url: str) -> dict:
+    payload = {"status": status, "text": _format_upstream_error(status, body, url)}
+    local = _local_budget_error(body, url)
+    if local:
+        payload.update(origin="pigeon_budget_guard", reason_code=local.get("code", "budget_blocked"), fallback_eligible=False)
+    return payload
+
+
 def _format_upstream_error(status: int, body: bytes | str, url: str) -> str:
     """Turn an upstream HTTP error into a user-readable sentence.
 
     Auth failures (401/403) become 'xAI rejected the API key' etc., so the UI
     stops showing raw JSON like '{"error":{"message":"User not found."}}'.
     """
+    local = _local_budget_error(body, url)
+    if local:
+        return str(local.get("message") or "PIGEON local test budget blocked this request. No OpenAI generation request was sent.")
     if isinstance(body, bytes):
         try:
             body = body.decode("utf-8", errors="replace")
@@ -1636,7 +1661,7 @@ def _format_upstream_error(status: int, body: bytes | str, url: str) -> str:
     return f"{provider} returned HTTP {status}" + (f": {detail}" if detail else "")
 
 # Models that require max_completion_tokens instead of max_tokens
-_MAX_COMPLETION_TOKENS_MODELS = {"o1", "o3", "o4", "gpt-4.5", "gpt-5"}
+_MAX_COMPLETION_TOKENS_MODELS = {"o1", "o3", "o4", "gpt-4.5", "gpt-5", "gpt-6"}
 
 def _uses_max_completion_tokens(model: str) -> bool:
     """Check if a model requires max_completion_tokens instead of max_tokens."""
@@ -3050,7 +3075,7 @@ async def _stream_llm_inner(url: str, model: str, messages: List[Dict], temperat
                 if r.status_code != 200:
                     raw = (await r.aread()).decode(errors="replace")
                     friendly = _format_chatgpt_subscription_error(r.status_code, _chatgpt_safe_error(raw, h))
-                    yield f'event: error\ndata: {json.dumps({"status": r.status_code, "text": friendly})}\n\n'
+                    yield f'event: error\ndata: {json.dumps(_upstream_error_payload(r.status_code, raw, target_url))}\n\n'
                     return
                 async for line in r.aiter_lines():
                     if not line:
@@ -3171,7 +3196,7 @@ async def _stream_llm_inner(url: str, model: str, messages: List[Dict], temperat
                 if r.status_code != 200:
                     raw = (await r.aread()).decode(errors="replace")
                     friendly = _format_upstream_error(r.status_code, raw, target_url)
-                    yield f'event: error\ndata: {json.dumps({"status": r.status_code, "text": friendly})}\n\n'
+                    yield f'event: error\ndata: {json.dumps(_upstream_error_payload(r.status_code, raw, target_url))}\n\n'
                     return
                 async for line in r.aiter_lines():
                     if not line:
@@ -3270,7 +3295,7 @@ async def _stream_llm_inner(url: str, model: str, messages: List[Dict], temperat
                 if r.status_code != 200:
                     raw = (await r.aread()).decode(errors="replace")
                     friendly = _format_upstream_error(r.status_code, raw, target_url)
-                    yield f'event: error\ndata: {json.dumps({"status": r.status_code, "text": friendly})}\n\n'
+                    yield f'event: error\ndata: {json.dumps(_upstream_error_payload(r.status_code, raw, target_url))}\n\n'
                     return
                 async for line in r.aiter_lines():
                     # SSE allows "data:value" with no space after the colon
@@ -3454,7 +3479,7 @@ async def _stream_llm_inner(url: str, model: str, messages: List[Dict], temperat
             if r.status_code != 200:
                 raw = (await r.aread()).decode(errors="replace")
                 friendly = _format_upstream_error(r.status_code, raw, target_url)
-                yield f'event: error\ndata: {json.dumps({"status": r.status_code, "text": friendly})}\n\n'
+                yield f'event: error\ndata: {json.dumps(_upstream_error_payload(r.status_code, raw, target_url))}\n\n'
                 return
 
             first_token_budget = _first_token_timeout(target_url, timeout)

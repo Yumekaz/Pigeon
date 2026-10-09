@@ -78,8 +78,9 @@ test('layer mask link controls independent movement and survives reopen', async 
     y: layer.offset.y + layer.masks[0].offset.y,
   };
 
-  await layerRow.click();
-  await dragOnCanvas(page, { x: 0.4, y: 0.4 }, { x: 0.5, y: 0.45 });
+  await layerRow.locator('.ge-layer-inline-thumb').click();
+  // Move picks rendered alpha: start on the painted stroke, not transparent pixels.
+  await dragOnCanvas(page, { x: 0.3, y: 0.4 }, { x: 0.4, y: 0.45 });
   current = await editorState(page);
   layer = current.layers.find(item => item.id === layerId);
   expect(layer.offset.x).toBeGreaterThan(originalLayer.offset.x);
@@ -112,7 +113,7 @@ test('layer mask link controls independent movement and survives reopen', async 
   const relinked = current.layers.find(item => item.id === layerId);
   expect(relinked.masks[0].linked).toBe(true);
   const linkedRelativeOffset = { ...relinked.masks[0].offset };
-  await layerRow.click();
+  await layerRow.locator('.ge-layer-inline-thumb').click();
   await dragOnCanvas(page, { x: 0.35, y: 0.35 }, { x: 0.45, y: 0.35 });
   current = await editorState(page);
   layer = current.layers.find(item => item.id === layerId);

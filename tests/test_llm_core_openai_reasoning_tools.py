@@ -110,3 +110,12 @@ def test_deepseek_v4_thinking_off_overrides_reasoning_defaults():
 
     assert payload["thinking"] == {"type": "disabled"}
     assert payload["reasoning_effort"] == "none"
+
+
+def test_gpt6_luna_chat_tools_use_compatible_reasoning_and_output_budget():
+    for model in ["gpt-6-luna", "openai/gpt-6-luna"]:
+        payload = {"tools": [_tool()], "reasoning_effort": "medium"}
+        llm_core._scrub_openai_chat_tool_reasoning(
+            payload, "https://api.openai.com/v1/chat/completions", model)
+        assert payload["reasoning_effort"] == "none"
+        assert llm_core._uses_max_completion_tokens(model)

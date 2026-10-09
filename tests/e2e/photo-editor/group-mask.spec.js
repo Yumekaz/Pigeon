@@ -16,10 +16,10 @@ test('group mask paints, toggles, survives history and reopen, and protects ungr
   await page.locator('#ge-group-selected').click();
   const groupId = (await editorState(page)).groups[0].id;
   const groupRow = page.locator(`.ge-layer-group-row[data-group-id="${groupId}"]`);
-  await page.locator('.ge-layer-item:is(.active, .active-parent) .ge-group-mask-btn').click();
+  await page.locator('.ge-layer-group-row.active .ge-group-mask-btn').click();
 
   await expect(page.locator('.ge-group-mask-sub-item')).toHaveCount(1);
-  await expect(page.locator('.ge-layer-item:is(.active, .active-parent) button[title="Delete group masks before ungrouping"]')).toBeDisabled();
+  await expect(page.locator('.ge-layer-group-row.active button[title="Delete group masks before ungrouping"]')).toBeDisabled();
   let current = await editorState(page);
   expect(current.groups[0].masks).toHaveLength(1);
   expect(current.groups[0].masks[0]).toMatchObject({ mode: 'group', size: [420, 300] });
@@ -62,7 +62,7 @@ test('group mask paints, toggles, survives history and reopen, and protects ungr
   await page.locator('.ge-group-mask-sub-item button[title="Delete group mask"]').click();
   await expect(page.locator('.ge-group-mask-sub-item')).toHaveCount(0);
   await groupRow.click();
-  await page.locator('.ge-layer-item:is(.active, .active-parent) button[title="Ungroup layers"]').click();
+  await page.locator('.ge-layer-group-row.active button[title="Ungroup layers"]').click();
   expect((await editorState(page)).groups).toHaveLength(0);
   await request.delete(`/api/editor-drafts/${encodeURIComponent(draftId)}`);
 });

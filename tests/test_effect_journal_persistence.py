@@ -31,6 +31,18 @@ def records(path):
     return [json.loads(line) for line in path.read_text().splitlines()]
 
 
+def test_binary_journal_offsets_survive_multiple_appends_and_reload(tmp_path, target):
+    directory = tmp_path / 'fx'
+    log = EffectLog(RUN, directory=directory)
+    claim(log, target, 'first', 'action-first')
+    claim(log, target, 'second', 'action-second')
+    raw = log.path.read_bytes()
+    assert b'\r\n' not in raw, 'Windows text conversion must not alter journal byte offsets'
+    assert log._offset == len(raw)
+    reloaded = EffectLog.load(RUN, directory=directory)
+    assert {record.effect_id for record in reloaded.history().claims} == {'first', 'second'}
+
+
 def test_claim_is_fsynced_to_disk_before_returning(tmp_path, target, monkeypatch):
     synced = []
     real_fsync = os.fsync
@@ -41,7 +53,8 @@ def test_claim_is_fsynced_to_disk_before_returning(tmp_path, target, monkeypatch
     on_disk = records(log.path)
     assert [r["type"] for r in on_disk] == ["claim"]
     assert fx.EffectClaim.from_dict(on_disk[0]["record"]) == made
-    assert oct(log.path.stat().st_mode & 0o777) == "0o600"
+    if os.name == 'posix':
+        assert oct(log.path.stat().st_mode & 0o777) == "0o600"
 
 
 def test_claim_persistence_failure_raises_and_records_nothing(tmp_path, target):

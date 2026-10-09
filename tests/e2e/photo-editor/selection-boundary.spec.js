@@ -126,7 +126,7 @@ test('transform selection moves, scales, rotates, cancels, and preserves layer p
   await page.locator('#ge-transform-cancel-btn').click();
 });
 
-test('named selections support reselect, load, delete, and server-draft reopen', async ({ page }) => {
+test('named selections support reselect, load, delete, and server-draft reopen', async ({ page }, testInfo) => {
   await openBlankEditor(page, { width: 320, height: 240 }, 'Saved selections');
   await page.locator('.ge-tool-btn[data-tool="marquee"]').click();
   await dragOnCanvas(page, { x: 0.15, y: 0.2 }, { x: 0.5, y: 0.6 });
@@ -176,6 +176,12 @@ test('named selections support reselect, load, delete, and server-draft reopen',
   await page.locator('#ge-selection-menu-btn').click();
   await expect(page.locator('#ge-selection-menu')).toBeVisible();
   const mobileMenu = await page.locator('#ge-selection-menu').boundingBox();
+  await testInfo.attach('mobile-selection-menu-geometry', { body: JSON.stringify(await page.locator('#ge-selection-menu').evaluate(menu => ({
+    rect: menu.getBoundingClientRect().toJSON(), translate: menu.style.translate,
+    computedTranslate: getComputedStyle(menu).translate,
+    parentRect: menu.parentElement.getBoundingClientRect().toJSON(),
+    ancestors: [...(function* () { let p = menu.parentElement; while (p) { yield p; p = p.parentElement; } })()].map(p => ({ tag: p.className, transform: getComputedStyle(p).transform, width: p.offsetWidth })),
+  }))), contentType: 'application/json' });
   expect(mobileMenu.x).toBeGreaterThanOrEqual(0);
   expect(mobileMenu.x + mobileMenu.width).toBeLessThanOrEqual(390);
 });

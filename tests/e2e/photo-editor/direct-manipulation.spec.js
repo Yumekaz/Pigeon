@@ -112,12 +112,14 @@ test('touch brush paints and undoes as one stroke', async ({ browser, browserNam
   try {
     await openBlankEditor(page, { width: 320, height: 240 }, 'Touch brush');
     const cdp = await context.newCDPSession(page);
-    const canvasBox = await page.locator('.ge-main-canvas').boundingBox();
     const touch = async (type, x, y) => cdp.send('Input.dispatchTouchEvent', {
       type,
       touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1, radiusX: 6, radiusY: 6 }],
     });
     await page.locator('.ge-tool-btn[data-tool="brush"]').click();
+    await page.locator('.ge-tool-btn[data-tool="brush"]').click();
+    await expect(page.locator('.ge-controls')).toHaveClass(/dismissed/);
+    const canvasBox = await page.locator('.ge-main-canvas').boundingBox();
     const before = await flattenedPixelDigest(page);
     await touch('touchStart', canvasBox.x + canvasBox.width * 0.25, canvasBox.y + canvasBox.height * 0.5);
     await touch('touchMove', canvasBox.x + canvasBox.width * 0.75, canvasBox.y + canvasBox.height * 0.5);

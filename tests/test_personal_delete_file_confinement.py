@@ -1,5 +1,6 @@
 import asyncio
 import os
+import pytest
 from pathlib import Path
 
 from routes import personal_routes
@@ -37,7 +38,12 @@ def test_delete_file_refuses_symlink_directory_escape(tmp_path, monkeypatch):
     outside.mkdir()
     victim = outside / "victim.txt"
     victim.write_text("keep me", encoding="utf-8")
-    os.symlink(outside, uploads / "linked")
+    try:
+        os.symlink(outside, uploads / "linked")
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows does not grant symlink creation; confinement assertions not executed")
+        raise
 
     docs = _FakePersonalDocs()
     rag = _FakeRAG()

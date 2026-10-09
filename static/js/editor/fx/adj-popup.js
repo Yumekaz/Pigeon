@@ -49,7 +49,7 @@ import {
 } from '../layer-helpers.js';
 import { drawHistogram } from './histogram.js';
 
-export function createAdjPopupSystem({ composite, saveState, renderLayerPanel, getAdjustmentSource = null }) {
+export function createAdjPopupSystem({ composite, saveState, schedulePersist, renderLayerPanel, getAdjustmentSource = null }) {
   function suppressLayerGhostTap() {
     window.__geSuppressLayerTapUntil = Date.now() + 650;
   }
@@ -504,6 +504,7 @@ export function createAdjPopupSystem({ composite, saveState, renderLayerPanel, g
       layer._adjFinalKey = null;
       composite();
       renderLayerPanel();
+      schedulePersist?.();
       closeAdjPopup();
     });
   }

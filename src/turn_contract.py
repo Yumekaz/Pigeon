@@ -917,6 +917,11 @@ def creation_container_tool(message: str) -> str | None:
 def standalone_code_request(message: str) -> bool:
     """Recognize a new code artifact, leaving explicit filesystem work alone."""
     text = _normalize_request_lead(message)
+    if (re.search(r'\b(?:open|active|current)\s+document\b', text, re.I)
+            and targets_bound_editor_request(text)):
+        # Writing-menu FIND/REPLACE instructions mention HTML tags as source
+        # formatting. They do not request a newly created HTML artifact.
+        return False
     if re.search(r'\b(?:repo(?:sitory)?|workspace|directory|folder|filesystem|on disk|terminal)\b|(?:~?/|[A-Za-z]:\\\\)\S+', text, re.I):
         return False
     if re.search(r'\b(?:using|with|via)\s+(?:bash|shell|python)\b', text, re.I):

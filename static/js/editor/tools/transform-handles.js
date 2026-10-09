@@ -65,7 +65,7 @@ export function syncOverlay(margin) {
 }
 
 
-function rotationHandleInside(frame) {
+export function rotationHandleInside(frame) {
   let inside = false;
   const outside = transformFrameGeometry(frame, { zoom: state.zoom }).rotationHandle;
   // The overlay deliberately extends beyond the image, so only fold the

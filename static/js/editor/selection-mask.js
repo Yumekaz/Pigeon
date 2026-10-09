@@ -33,14 +33,14 @@ export function normalizeConstrainedSelectionRect(start, end, width, height, opt
   const mode = ['ratio', 'size'].includes(options.mode) ? options.mode : 'free';
   if (mode === 'free') return normalizeSelectionRect(start, end, width, height, !!options.square);
 
-  const sx = Math.max(0, Math.min(width, Number(start.x) || 0));
-  const sy = Math.max(0, Math.min(height, Number(start.y) || 0));
+  const sx = Math.round(Math.max(0, Math.min(width, Number(start.x) || 0)));
+  const sy = Math.round(Math.max(0, Math.min(height, Number(start.y) || 0)));
   if (mode === 'size') {
     const w = Math.max(1, Math.min(width, Math.round(Number(options.fixedWidth) || 1)));
     const h = Math.max(1, Math.min(height, Math.round(Number(options.fixedHeight) || 1)));
     return {
-      x: Math.max(0, Math.min(width - w, sx)),
-      y: Math.max(0, Math.min(height - h, sy)),
+      x: Math.max(0, Math.min(width - w, Math.round(sx))),
+      y: Math.max(0, Math.min(height - h, Math.round(sy))),
       w,
       h,
     };

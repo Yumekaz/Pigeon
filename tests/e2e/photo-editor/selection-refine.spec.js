@@ -55,7 +55,7 @@ test('selection clipboard copy and paste creates an undoable independent layer',
   await request.delete(`/api/editor-drafts/${encodeURIComponent(draftId)}`);
 });
 
-test('cut selection is one undoable move from source to new layer', async ({ page }) => {
+test('cut selection is one undoable clipboard operation without a new layer', async ({ page }) => {
   await openBlankEditor(page, { width: 320, height: 240 }, 'Selection cut');
   await page.locator('.ge-tool-btn[data-tool="brush"]').click();
   await dragOnCanvas(page, { x: 0.18, y: 0.24 }, { x: 0.72, y: 0.68 });
@@ -76,9 +76,8 @@ test('cut selection is one undoable move from source to new layer', async ({ pag
   });
   const beforeSource = await sourceSignature();
   await page.keyboard.press('Control+x');
-  await expect(page.locator('.ge-layer-item').filter({ hasText: 'Wand copy' })).toBeVisible();
   const cut = await editorState(page);
-  expect(cut.layers).toHaveLength(before.layers.length + 1);
+  expect(cut.layers).toHaveLength(before.layers.length);
   expect(await sourceSignature()).not.toBe(beforeSource);
 
   await page.locator('#ge-undo').click();
@@ -101,9 +100,9 @@ test('completed lasso copy preserves the source layer coordinate space', async (
   const before = await editorState(page);
   const source = before.layers.find(layer => layer.id === before.activeLayerId);
   await page.locator('#ge-lasso-copy').click();
-  await expect(page.locator('.ge-layer-item').filter({ hasText: 'Wand copy' })).toBeVisible();
+  await expect(page.locator('.ge-layer-item').filter({ hasText: 'Selection' })).toBeVisible();
   const copied = await editorState(page);
-  const copy = copied.layers.find(layer => layer.name === 'Wand copy');
+  const copy = copied.layers.find(layer => layer.name === 'Selection');
   expect(copy.size).toEqual(source.size);
   expect(copy.offset).toEqual(source.offset);
 });

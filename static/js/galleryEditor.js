@@ -129,6 +129,7 @@ import {
   groupAncestors as _groupAncestors,
   isLayerEffectivelyLocked as _isLayerEffectivelyLocked,
   isLayerPixelLocked as _isLayerPixelLocked,
+  isLayerPositionLocked as _isLayerPositionLocked,
   isLayerTransparencyLocked as _isLayerTransparencyLocked,
   normalizeLayerLocks as _normalizeLayerLocks,
   normalizeLayerGroups as _normalizeLayerGroups,
@@ -1015,6 +1016,7 @@ function _renderLayerPixelAdjustments(layer) {
 const _adjPopupSystem = createAdjPopupSystem({
   composite,
   saveState: _saveState,
+  schedulePersist: _schedulePersist,
   renderLayerPanel: () => _renderLayerPanel(),
   getAdjustmentSource: layer => _adjustmentSourceCanvas(layer),
 });
@@ -2864,9 +2866,11 @@ async function _confirmRasterizeLayer(layer) {
 }
 
 function _beginDraw(e) {
-  // Move always follows the object under the pointer. Selecting it before the
-  // drag starts keeps the active layer, layer panel, and dragged pixels aligned.
-  if (state.tool === 'move') {
+  // Single-layer Move follows rendered alpha. Keep explicit masks/groups and
+  // position-locked targets selected instead of switching to underlying pixels.
+  const moveTarget = activeLayer() || _activeParentLayer();
+  if (state.tool === 'move' && !state.activeGroupId && !_getActiveMaskLayer() &&
+      !_isLayerPositionLocked(state, moveTarget)) {
     const picked = _pickLayerAtEvent(e);
     if (picked && picked.id !== state.activeLayerId) {
       state.activeLayerId = picked.id;
@@ -3902,6 +3906,7 @@ const _transformDragTool = createTransformDragTool({
 // shared drawing flag; clone's own begin is in editor/tools/clone.js.
 const _strokeTool = createStrokeTool({
   saveState: _saveState,
+  schedulePersist: _schedulePersist,
   undo,
   beginStroke: (sample, tool) => _beginStroke(sample, tool),
   strokeTo: (sample) => _strokeTo(sample),
@@ -7035,6 +7040,7 @@ function _loadProjectPrompt() {
       _fitZoom();
       if (uiModule) uiModule.showToast('Project loaded', 3000);
       _showDocumentRestoreReport(report);
+      _schedulePersist();
     } catch (e) {
       if (previousSnapshot) {
         Object.assign(state, previousView);

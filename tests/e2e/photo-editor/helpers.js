@@ -1,4 +1,11 @@
 const { expect } = require('@playwright/test');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.resolve(__dirname, '../../..');
+const appSource = fs.readFileSync(path.join(root, 'static/app.js'), 'utf8');
+const panelSource = fs.readFileSync(path.join(root, 'static/js/panels.js'), 'utf8');
+const galleryImport = '/static/' + appSource.match(/from ['"]\.\/(js\/gallery\.js[^'"]*)['"]/)[1];
+const editorImport = '/static/js/' + panelSource.match(/import\(['"]\.\/(galleryEditor\.js[^'"]*)['"]\)/)[1];
 
 async function openBlankEditor(page, size = { width: 640, height: 480 }, name = 'Photo editor E2E') {
   let lastError = null;
@@ -6,11 +13,13 @@ async function openBlankEditor(page, size = { width: 640, height: 480 }, name = 
     try {
       await page.goto('/', { waitUntil: 'domcontentloaded' });
       await page.locator('#tool-gallery-btn').waitFor({ state: 'attached', timeout: 20_000 });
-      await page.evaluate(async () => {
+      await page.evaluate(async imports => {
         window.__photoEditorImport = async path => {
+          if (path.startsWith('/static/js/gallery.js')) path = imports.gallery;
+          if (path.startsWith('/static/js/galleryEditor.js')) path = imports.editor;
           let lastImportError = null;
           for (let attempt = 0; attempt < 4; attempt += 1) {
-            const url = attempt === 0 ? path : `${path}?e2e_retry=${attempt}-${Date.now()}`;
+            const url = path; // Keep singleton identity on retries.
             try { return await import(url); } catch (error) { lastImportError = error; }
             await new Promise(resolve => setTimeout(resolve, 150 * (attempt + 1)));
           }
@@ -18,7 +27,7 @@ async function openBlankEditor(page, size = { width: 640, height: 480 }, name = 
         };
         const gallery = await window.__photoEditorImport('/static/js/gallery.js?v=20260830editor4');
         gallery.openGallery();
-      });
+      }, { gallery: galleryImport, editor: editorImport });
       await page.locator('#gallery-editor-tab').waitFor({ state: 'visible', timeout: 20_000 });
       await page.locator('#gallery-editor-tab').click();
       await page.evaluate(async ({ size: nextSize, name: nextName }) => {

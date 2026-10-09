@@ -362,7 +362,7 @@ def _write_new_file_without_overwrite(path: str, body: str) -> None:
     )
 
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as temporary_file:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as temporary_file:
             fd = None
             temporary_file.write(body)
         os.link(temporary_path, path)
@@ -514,7 +514,7 @@ class WriteFileTool:
                     return old, len(body)
 
                 attempted.append(True)
-                with open(path, "w", encoding="utf-8") as f:
+                with open(path, "w", encoding="utf-8", newline="") as f:
                     f.write(body)
                 return old, len(body)
             old_content, size = await asyncio.to_thread(_write)

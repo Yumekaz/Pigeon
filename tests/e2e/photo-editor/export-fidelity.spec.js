@@ -47,7 +47,7 @@ async function addAdjustment(page, type) {
 
 async function exportCurrentPng(page) {
   const dataUrl = await page.evaluate(async () => {
-    const editor = await import('/static/js/galleryEditor.js');
+    const editor = await window.__photoEditorImport('/static/js/galleryEditor.js');
     return editor.exportPNG();
   });
   return Buffer.from(dataUrl.split(',', 2)[1], 'base64');

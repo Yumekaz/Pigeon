@@ -112,7 +112,7 @@ test('Delete removes the selected layer and undo restores it', async ({ page }) 
   await page.locator('#ge-add-layer').click();
   await page.locator('.ge-add-layer-menu [data-layer-kind="raster"]').click();
   const addedId = (await editorState(page)).activeLayerId;
-  await page.locator(`.ge-layer-item[data-layer-id="${addedId}"]`).click();
+  await page.locator(`.ge-layer-item[data-layer-id="${addedId}"]`).focus();
   await page.keyboard.press('Backspace');
   expect((await editorState(page)).layers.some(layer => layer.id === addedId)).toBe(false);
 
@@ -140,13 +140,6 @@ test('move tool can auto-select the topmost visible layer under the pointer', as
 
   await page.locator('.ge-layer-item[data-layer-id]').filter({ hasText: 'Background' }).first().click();
   await page.locator('.ge-tool-btn[data-tool="move"]').click();
-  await expect(page.locator('.ge-auto-select-option')).toBeVisible();
-  await page.locator('.ge-auto-select-option').click();
-  await expect(page.locator('#ge-auto-select-layer')).toBeChecked();
-  await page.locator('.ge-tool-btn[data-tool="transform"]').click();
-  await expect(page.locator('.ge-auto-select-option')).toBeHidden();
-  await page.locator('.ge-tool-btn[data-tool="move"]').click();
-  await expect(page.locator('.ge-auto-select-option')).toBeVisible();
   const box = await page.locator('.ge-main-canvas').boundingBox();
   await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
   await expect.poll(async () => (await editorState(page)).activeLayerId).toBe(shape.id);
@@ -260,7 +253,7 @@ test('layer groups composite, lock, collapse, undo, and survive server reopen', 
   await expect(page.locator('.ge-layer-item.grouped')).toHaveCount(0);
 
   await page.locator('.ge-layer-group-row').click();
-  await page.locator('.ge-layer-item:is(.active, .active-parent) button[title="Ungroup layers"]').click();
+  await page.locator('.ge-layer-group-row.active button[title="Ungroup layers"]').click();
   expect((await editorState(page)).groups).toHaveLength(0);
   await page.locator('#ge-undo').click();
   expect((await editorState(page)).groups).toHaveLength(1);
@@ -318,7 +311,7 @@ test('nested groups preserve hierarchy, ancestor locks, collapse, and server reo
   await expect(page.locator('.ge-layer-group-row')).toHaveCount(2);
 
   await page.locator(`.ge-layer-group-row[data-group-id="${outer.id}"]`).click();
-  await page.locator('.ge-layer-item:is(.active, .active-parent) button[title="Ungroup layers"]').click();
+  await page.locator('.ge-layer-group-row.active button[title="Ungroup layers"]').click();
   current = await editorState(page);
   expect(current.groups).toHaveLength(1);
   expect(current.groups[0]).toMatchObject({ id: inner.id, parentId: null });

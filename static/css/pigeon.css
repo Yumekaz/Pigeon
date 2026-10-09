@@ -182,3 +182,7 @@ html { scrollbar-color:var(--border) var(--bg); }
 .pigeon-login .logo span { background:none!important; -webkit-text-fill-color:currentColor!important; color:var(--pigeon-ivory); font-family:inherit; }
 :root.light .pigeon-login .logo span { color:var(--pigeon-burgundy); }
 :root.light .pigeon-login-bird { background:var(--pigeon-midnight); border-radius:10px; padding:4px; }
+
+/* Keep the launch controls reachable when the saved-project list grows. */
+.gallery-editor-landing { min-height:0; overflow-y:auto; justify-content:flex-start; }
+.gallery-editor-landing > * { flex-shrink:0; }

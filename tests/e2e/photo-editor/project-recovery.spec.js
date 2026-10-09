@@ -108,7 +108,7 @@ test('new project size dialog cancels cleanly with Escape', async ({ page }) => 
   await expect(page.locator('#gallery-editor-new')).toBeVisible();
 });
 
-test('editor topbar uses uppercase action labels', async ({ page }) => {
+test('editor topbar separates actions from live draft status', async ({ page }) => {
   await openBlankEditor(page, { width: 320, height: 240 }, 'Topbar labels');
 
   await expect(page.locator('#ge-view-menu-btn')).toHaveText(/VIEW/);
@@ -116,7 +116,8 @@ test('editor topbar uses uppercase action labels', async ({ page }) => {
   await expect(page.locator('#ge-selection-menu-btn')).toHaveText(/SELECT/);
   await expect(page.locator('#ge-filter-menu-btn')).toHaveText(/FILTER/);
   await expect(page.locator('#ge-import-topbar')).toHaveText(/IMPORT/);
-  await expect(page.locator('#ge-save-menu-btn')).toHaveText(/SAVE/);
+  await expect(page.locator('#ge-save-menu-btn')).toHaveText(/Sav(?:ed|ing)/);
+  await expect(page.locator('#ge-save-menu-btn')).toHaveAttribute('title', /Draft status:/);
 });
 
 test('canvas size anchor keeps the composition centered', async ({ page }) => {

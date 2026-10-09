@@ -17,12 +17,14 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 # Two model ids so the Compare area has something to reveal.
 MODEL_PRIMARY = "odysseus-smoke-primary"
 MODEL_SECONDARY = "odysseus-smoke-secondary"
-MODELS = (MODEL_PRIMARY, MODEL_SECONDARY)
+MODEL_LUNA = "gpt-6-luna"
+MODELS = (MODEL_PRIMARY, MODEL_SECONDARY, MODEL_LUNA)
 
 # The marker each reply starts with. Distinctive enough that finding it
 # in a response body cannot be a coincidence, and short enough to read
@@ -45,6 +47,9 @@ class _Recorder:
     def __init__(self):
         self._lock = threading.Lock()
         self._calls = []
+        self.native_document_id = None
+        self.native_suggestion_args = None
+        self.native_document_reply = "PIGEON native tool fixture."
 
     def record(self, payload: dict) -> None:
         with self._lock:
@@ -106,6 +111,19 @@ def _handler_for(recorder: _Recorder):
 
             model = str(payload.get("model") or MODEL_PRIMARY)
             text = reply_for(model)
+            if recorder.native_suggestion_args and model == MODEL_LUNA:
+                self._send_tool_stream(model, {"index": 0, "id": "smoke-suggestion-" + str(time.time_ns()),
+                    "type": "function", "function": {"name": "suggest_document", "arguments": json.dumps(recorder.native_suggestion_args)}})
+                return
+            if recorder.native_document_id and model == MODEL_LUNA:
+                results = [str(m.get("content") or "") for m in payload.get("messages", []) if m.get("role") == "tool"]
+                if results:
+                    text = recorder.native_document_reply if any(recorder.native_document_reply in result for result in results) else "STUB-DOCUMENT-READ-FAILED"
+                elif any(t.get("function", {}).get("name") == "manage_documents" for t in payload.get("tools", [])):
+                    call = {"index": 0, "id": "smoke-document-read-" + recorder.native_document_id, "type": "function", "function": {
+                        "name": "manage_documents", "arguments": json.dumps({"action": "read", "document_id": recorder.native_document_id})}}
+                    self._send_tool_stream(model, call)
+                    return
             if payload.get("stream"):
                 self._send_stream(model, text)
                 return
@@ -120,6 +138,19 @@ def _handler_for(recorder: _Recorder):
                 }],
                 "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
             })
+
+        def _send_tool_stream(self, model, call):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            for chunk in [
+                {"choices": [{"index": 0, "delta": {"tool_calls": [call]}}], "model": model},
+                {"choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}], "model": model},
+            ]:
+                self.wfile.write(b"data: " + json.dumps(chunk).encode("utf-8") + b"\n\n")
+            self.wfile.write(b"data: [DONE]\n\n")
+            self.wfile.flush()
 
         def _send_stream(self, model: str, text: str) -> None:
             self.send_response(200)

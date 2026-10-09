@@ -58,7 +58,7 @@ test('Levels is a retained stack layer with clipping, masks, history, and persis
   const expected = await editorState(page);
   const expectedPixels = await flattenedPixelDigest(page);
   const exportedPng = await page.evaluate(async () => {
-    const editor = await import('/static/js/galleryEditor.js');
+    const editor = await window.__photoEditorImport('/static/js/galleryEditor.js');
     return editor.exportPNG();
   });
   expect(await encodedImagePixelDigest(

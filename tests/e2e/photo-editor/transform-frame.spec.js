@@ -222,13 +222,15 @@ test('mobile touch input can grab every transform handle', async ({ browser, bro
     const handlePoint = id => page.evaluate(async handleId => {
       const { state } = await import('/static/js/editor/state.js');
       const { transformFrameGeometry } = await import('/static/js/editor/transform-frame-geometry.js');
-      const geometry = transformFrameGeometry({
+      const { rotationHandleInside } = await import('/static/js/editor/tools/transform-handles.js');
+      const frame = {
         centerX: state.transformCenter.x,
         centerY: state.transformCenter.y,
         width: state.transformPendingW,
         height: state.transformPendingH,
         rotation: state.transformPendingRot,
-      }, { zoom: state.zoom, rotationInside: handleId === 'rot' });
+      };
+      const geometry = transformFrameGeometry(frame, { zoom: state.zoom, rotationInside: rotationHandleInside(frame) });
       const handle = geometry.handles.find(item => item.id === handleId);
       const rect = state.mainCanvas.getBoundingClientRect();
       return {

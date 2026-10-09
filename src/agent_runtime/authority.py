@@ -21,6 +21,7 @@ from src.tool_policy import ToolPolicy, build_effective_tool_policy
 from src.turn_contract import (
     FAMILY_TOOLS, canonical_tool, requested_capabilities,
     RequiredReadOperation, required_read_operation_for_request, selected_tools_for_request,
+    preserve_bound_editor_selected_tools,
 )
 
 
@@ -349,7 +350,13 @@ def interpret_request(request_text, *, history=(), workspace=None, active_docume
             trusted_history.append({"role": "user", "content": get("content", "")})
     families = requested_capabilities(request_text, trusted_history,
         active_document=active_document, workspace=bool(workspace), image_attachment=image_attachment)
-    selected = selected_tools_for_request(request_text)
+    # Match the HTTP route's bound-editor selection. Writing-menu instructions
+    # can contain FIND/REPLACE or source language that looks like a separate
+    # code-creation request; the verified active editor remains the target.
+    selected = preserve_bound_editor_selected_tools(
+        request_text, selected_tools_for_request(request_text),
+        active_document=active_document,
+    )
     if (families <= {"unknown"} and selected is None
             and re.search(r"\b(?:lan|local\s+(?:network|ip)|tailscale|arp|ip\s+route|default\s+route|subnet|network\s+interface|neighbor\s+table|wifi|ethernet)\b", request_text, re.I)
             and re.search(r"\b(?:find|check|inspect|show|list|lookup|locate)\b", request_text, re.I)

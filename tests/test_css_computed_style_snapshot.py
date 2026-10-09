@@ -11,6 +11,8 @@ baseline, and only after confirming the change is intended - see
 ``tests/css_snapshot/README.md``.
 """
 import os
+import json
+from pathlib import Path
 
 import pytest
 
@@ -101,6 +103,11 @@ def test_capture_does_not_execute_script_markup_or_handlers(tmp_path):
 @_requires_browser
 def test_computed_styles_match_the_committed_baseline():
     captured = snapshot.capture(static_origin())
+    evidence_path = os.environ.get("CSS_SNAPSHOT_FAILURE_OUTPUT")
+    if evidence_path:
+        output = Path(evidence_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(captured), encoding="utf-8")
 
     assert captured["missing"] == {}, (
         "inventory entries matched no element - the markup moved under the "

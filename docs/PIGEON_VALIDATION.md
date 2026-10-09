@@ -11,11 +11,11 @@ The final combined regression run passed **135 tests**. Four separate snapshot-h
 | Publication: brand asset hashes, dependency notices, fonts, print escaping, PWA metadata and cache activation | 8 passed |
 | Generated research/search presentation and OAuth/source escaping | 38 passed |
 | Action contrast across brand colors and boundary cases | 8 cases passed |
-| Computed styles | 24 viewport/theme/density variants across three pages; 676 elements; no missing entries |
+| Computed styles | Earlier result withdrawn: the saved values were unstyled; see CI correction below |
 
 JavaScript syntax was checked in 244 module/inline-script cases with zero failures.
 
-Counts are separate suite results and overlap; they are not summed into a unique-test total. The original style baseline and unsuccessful raw attempts are retained locally. The current baseline records the reviewed redesign.
+Counts are separate suite results and overlap; they are not summed into a unique-test total. The original style baseline and unsuccessful raw attempts are retained locally. The initial baseline was invalid and has been replaced with a styled capture that verifies stylesheet loading.
 
 ## Browser evidence
 
@@ -34,3 +34,13 @@ Selected core interaction cases passed, and the gallery layout regression introd
 Live model responses, provider switching against real services, agent execution, research generation, vector retrieval, email delivery, CalDAV synchronization, GPU serving, and credential-dependent integrations remain unverified. The preview has no configured model/email accounts or ChromaDB. Installed PWA appearance on physical devices and Firefox/WebKit were not tested. Chromium and the desktop browser supplied the rendered evidence.
 
 Required attribution and notices were checked against the original files. Ten staged vendored artifacts retain their recorded hashes. Publication excludes runtime data, dependency environments, raw captures, and internal planning records. Initial source import preserves inherited whitespace; the new design files are checked separately.
+
+## CI correction
+
+Remote CI on `bec3feb` exposed 20 failed tests across four shards. A branding replacement had changed the internal `X-Odysseus-Run-Id` header; it is restored for streaming identity, Stop, and resume. Login asset paths now remain relative under reverse-proxy mounts. Every app stylesheet and its service-worker entry share `pigeon2`; the service-worker cache is `pigeon-v3`.
+
+The earlier computed-style baseline had unstyled browser defaults, so its reported design coverage is withdrawn. The harness now supplies frozen stylesheet sources on every capture and rejects any unloaded stylesheet. The replacement raw capture is retained locally; Linux CI also retains raw computed values to diagnose platform differences.
+
+Public-document inventory checks now cover the four published guides, rather than requiring internal migration/audit notes. Product-label assertions and the issue checker match PIGEON, while the checker still accepts the historical revision heading. The generated configuration reference and README authentication guidance are synchronized.
+
+This private repository cannot use GitHub CodeQL without the required entitlement. At the owner's request, CodeQL is replaced by Semgrep Community Edition for first-party Python/JavaScript; the existing actionlint/zizmor workflow continues auditing Actions. Semgrep runs with metrics disabled and fails on ERROR-level findings or configuration/scanner errors. Findings remain downloadable in Actions artifacts. This is different analysis coverage, not a claim of CodeQL equivalence.

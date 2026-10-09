@@ -5,8 +5,8 @@ import { chromium } from 'playwright';
 
 // Execute the production browser entry functions with local network/session
 // adapters. These are behavioral DOM tests, not assertions about source text.
-const renderer = await readFile(new URL('../static/js/chatRenderer.js', import.meta.url), 'utf8');
-const chat = await readFile(new URL('../static/js/chat.js', import.meta.url), 'utf8');
+const renderer = (await readFile(new URL('../static/js/chatRenderer.js', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
+const chat = (await readFile(new URL('../static/js/chat.js', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
 const addMessage = renderer.slice(renderer.indexOf('export function addMessage('), renderer.indexOf('\nconst chatRenderer =')).replace('export ', '');
 const resume = chat.slice(chat.indexOf('export async function resumeStream('), chat.indexOf('\n  /**\n   * Check for background streams')).replace('export ', '');
 let browser;

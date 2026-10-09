@@ -17,13 +17,9 @@ REPO = Path(__file__).resolve().parent.parent
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 VIDEO_EXTS = {".webm", ".mp4", ".mov", ".m4v"}
 PUBLIC_GUIDES = {
-    "agent-migration.md",
     "attachments.md",
     "backup-restore.md",
     "configuration-reference.md",
-    "email-outlook.md",
-    "pr-blocker-audit.md",
-    "security-ci.md",
     "setup.md",
 }
 # Files a referenced image name could legitimately appear in.

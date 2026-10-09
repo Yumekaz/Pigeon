@@ -272,7 +272,7 @@ async function main() {
           return route.continue();
         });
 
-        if (job.swapRule) {
+        if (job.sourceStyles || job.swapRule) {
           // The cascade is spread over several files, so find the one that
           // actually holds two top-level blocks of the selector and rewrite
           // only that one. Every other sheet passes through untouched.
@@ -280,7 +280,7 @@ async function main() {
             const prepared = job.sourceStyles?.[new URL(route.request().url()).pathname];
             const response = prepared === undefined ? await route.fetch() : null;
             const original = prepared ?? await response.text();
-            const body = swapRuleOccurrences(original, job.swapRule);
+            const body = job.swapRule ? swapRuleOccurrences(original, job.swapRule) : null;
             if (body !== null) swapped += 1;
             await route.fulfill({ status: 200, body: body ?? original, contentType: 'text/css; charset=utf-8' });
           });
@@ -322,6 +322,9 @@ async function main() {
         if (!response || !response.ok()) {
           throw new Error(`${page.url} returned ${response ? response.status() : 'no response'}`);
         }
+        // A missing stylesheet must fail capture rather than establish an unstyled baseline.
+        const styleFailures = await tab.evaluate(() => Array.from(document.querySelectorAll('link[rel="stylesheet"]')).filter(link => !link.sheet).map(link => link.href));
+        if (styleFailures.length) throw new Error(`Stylesheets failed to load: ${styleFailures.join(', ')}`);
         if (job.measurementDelayMs) await tab.waitForTimeout(job.measurementDelayMs);
         const result = await tab.evaluate(pageMeasure, {
           elements: page.elements || [],

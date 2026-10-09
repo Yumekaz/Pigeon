@@ -2,7 +2,7 @@
 <h1 align="center">PIGEON</h1>
 <p align="center">A quiet space for ambitious work.</p>
 <p align="center">A self-hosted AI workspace for chat, agents, research, documents, and your daily tools.</p>
-<p align="center"><a href="#getting-started">Getting started</a> · <a href="website/setup.md">Setup guide</a> · <a href="LICENSE">License</a></p>
+<p align="center"><a href="#getting-started">Getting started</a> Â· <a href="website/setup.md">Setup guide</a> Â· <a href="LICENSE">License</a></p>
 
 ![PIGEON workspace](assets/branding/pigeon-workspace.png)
 
@@ -52,7 +52,7 @@ Use an isolated data directory for tests. Windows runs should use UTF-8. See [te
 
 ## Security
 
-Keep authentication enabled for deployed instances. Bind locally unless you deliberately configure network access. Keep credentials, databases, uploads, and runtime artifacts out of version control. See [SECURITY.md](SECURITY.md).
+Keep `AUTH_ENABLED=true` for any network-accessible deployment. Keep `LOCALHOST_BYPASS=false` outside local development. Bind locally unless you deliberately configure network access. Keep credentials, databases, uploads, and runtime artifacts out of version control. See [SECURITY.md](SECURITY.md).
 
 ## License and acknowledgments
 

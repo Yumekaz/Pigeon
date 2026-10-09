@@ -188,9 +188,9 @@ Listed for completeness. Setting one of these on a real install is either a no-o
 
 | Variable | Default | Read in | What it does |
 |---|---|---|---|
-| `ODYSSEUS_COPILOT_EDITOR_VERSION` | `'PIGEON/1.0'` | `src/copilot.py` | Editor-version header presented to the Copilot API. Kept stable on purpose. |
+| `ODYSSEUS_COPILOT_EDITOR_VERSION` | `'Odysseus/1.0'` | `src/copilot.py` | Editor-version header presented to the Copilot API. Kept stable on purpose. |
 | `ODYSSEUS_COPILOT_INTEGRATION_ID` | `'vscode-chat'` | `src/copilot.py` | Integration id presented to the Copilot API. Kept stable on purpose. |
-| `ODYSSEUS_COPILOT_USER_AGENT` | `'PIGEON/1.0'` | `src/copilot.py` | Editor-like User-Agent presented to the Copilot API. Kept stable on purpose. |
+| `ODYSSEUS_COPILOT_USER_AGENT` | `'Odysseus/1.0'` | `src/copilot.py` | Editor-like User-Agent presented to the Copilot API. Kept stable on purpose. |
 | `ODYSSEUS_DEBUG_LLM_SHAPE` | `''` | `src/llm_core.py` | Truthy logs the shape of streamed provider chunks. Debugging aid for provider response parsing. |
 
 ### Agent loop and tool execution

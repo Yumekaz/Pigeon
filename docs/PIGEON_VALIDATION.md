@@ -1,5 +1,11 @@
 # PIGEON redesign validation
 
+## Current feature verification
+
+The October 9 feature pass supersedes the earlier editor and live-service limits below. The complete editor suite now passes **108 tests**, and the authenticated feature suite passes **19 tests**. Live gpt-6-luna chat, owned document reads and approved inline writing suggestions work. The full styled snapshot matches digest `57a46fa4e0697cda`.
+
+See [PIGEON feature validation](PIGEON_FEATURE_VALIDATION.md) for the current matrix, budget accounting, repairs and remaining platform/service limits. Earlier attempts below are retained as historical evidence, not the current release verdict.
+
 ## Executed checks
 
 The final combined regression run passed **135 tests**. Four separate snapshot-harness checks passed (inventory coverage, script blocking, timing/font stability, and cascade sensitivity). An isolated touch-brush paint/undo check passed. The wider editor run remained incomplete; a later batch recorded 15 passes, five failures, and 71 unexecuted cases after its failure limit.
@@ -23,7 +29,7 @@ The live shell, expanded sidebar and rail, Settings, Calendar, Memory, Skills, T
 
 Document creation opened the editor. A complete live editing/save cycle was not established in the unconfigured-model fixture; do not treat that as a verified save flow.
 
-## Editor release gate remains incomplete
+## Earlier editor release gate (superseded)
 
 The complete editor suite is not green. Twenty failing cases were independently reproduced against the original frontend using the same corrected locators: six adjustment/effect cases, four mobile mask/group cases, four placed-image cases, three text/shape cases, a stroke-performance case, a healing/reopen case, and the layered core-workflow case. These include missing retained-state assertions and navigation/reopen races. No editor rendering or persistence algorithm was rewritten for the redesign.
 

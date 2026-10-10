@@ -96,6 +96,16 @@ def test_only_luna_text_and_local_functions_with_capped_output():
         guard.payload_for({**base, "messages": [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "x"}}]}]})
 
 
+def test_small_model_probe_reserves_the_responses_minimum(tmp_path):
+    payload = guard.payload_for({'model': 'gpt-6-luna',
+        'messages': [{'role': 'user', 'content': 'hi'}], 'max_tokens': 5})
+    assert payload['max_output_tokens'] == 16
+    path = tmp_path / 'probe-ledger.sqlite3'
+    guard.initialize(path, {'approved_additional_budget_usd': '0.05', 'historical_reserved_usd': '0'})
+    guard.reserve(10, payload['max_output_tokens'], path)
+    assert guard.snapshot(path)['requests_pico_usd'] == 10 * guard.INPUT_RATE + 16 * guard.OUTPUT_RATE
+
+
 def test_tool_history_translates_without_losing_call_identity():
     payload = guard.payload_for({"model": "gpt-6-luna", "messages": [
         {"role": "assistant", "content": None, "tool_calls": [{"id": "call1", "type": "function", "function": {"name": "manage_documents", "arguments": "{}"}}]},

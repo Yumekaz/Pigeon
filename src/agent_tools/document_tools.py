@@ -499,57 +499,79 @@ def _create_pdf_text_derivative(db, *, source_doc, content: str, owner: Optional
     }
 
 
+def document_tool_event_metadata(result: dict) -> dict:
+    """Complete saved document metadata for ordinary and approved tool streams."""
+    if not result.get('doc_id') or not isinstance(result.get('content'), str):
+        return {}
+    metadata = {
+        'doc_id': result['doc_id'],
+        'document_action': result.get('action', 'create'),
+        'document_title': result.get('title', ''),
+        'document_language': result.get('language', ''),
+        'document_version': result.get('version', 1),
+        'document_content': result['content'],
+    }
+    if (result.get('exit_code') == 0 and not result.get('error')
+            and type(result.get('version')) is int and result['version'] > 0
+            and isinstance(result.get('title'), str) and result['title']):
+        metadata['document_artifacts'] = [result['title']]
+    return metadata
+
+
+def _parse_create_document(raw: str) -> tuple[str, str | None, str]:
+    """Separate the tool envelope from source code without rewriting the body."""
+    known_languages = {
+        "python", "javascript", "typescript", "html", "css", "richtext", "markdown", "json",
+        "yaml", "bash", "sql", "rust", "go", "java", "c", "cpp", "xml", "toml",
+        "ini", "ruby", "php", "csv", "email", "text", "plain", "svg",
+    }
+    envelope = re.fullmatch(
+        r"\s*(?:<title>\s*(.*?)\s*</title>\s*)?"
+        r"(?:<language>\s*(.*?)\s*</language>\s*)?"
+        r"<content>(.*)</content>\s*", raw or "", re.DOTALL | re.IGNORECASE,
+    )
+    if envelope:
+        title, language, body = envelope.groups()
+        language = (language or "").strip().lower()
+        return title or "Untitled", language if language in known_languages else None, body
+
+    lines = (raw or "").strip().split("\n")
+    title = lines.pop(0).strip() if lines else "Untitled"
+    title_tag = re.fullmatch(r"<title>\s*(.*?)\s*</title>", title, re.IGNORECASE)
+    wrapped_header = bool(title_tag)
+    if title_tag:
+        title = title_tag.group(1)
+    language = None
+    if lines:
+        candidate = lines[0].strip().lower()
+        language_tag = re.fullmatch(r"<language>\s*(.*?)\s*</language>", candidate)
+        if language_tag:
+            wrapped_header = True
+            candidate = language_tag.group(1)
+        if candidate in known_languages:
+            language = candidate
+            lines.pop(0)
+    body = "\n".join(lines)
+    content_tag = re.fullmatch(r"\s*<content>(.*)</content>\s*", body, re.DOTALL | re.IGNORECASE)
+    if content_tag and wrapped_header:
+        body = content_tag.group(1)
+    return title or "Untitled", language, body
+
+
 class CreateDocumentTool:
     async def execute(self, content: str, ctx: dict) -> dict:
         """Create a new document. Supports two formats:
         1) Line-based: line 1 = title, line 2 (optional) = language, rest = content
         2) XML-like tags: <title>...</title><language>...</language><content>...</content>
         Some models mix them — strip any XML-style tags and fall back to line parsing."""
-        import uuid, re as _re
+        import uuid
         from src.database import SessionLocal, Document, DocumentVersion, Session as DbSession
 
         raw = content or ""
         session_id = ctx.get("session_id")
         owner = ctx.get("owner")
 
-        # Known languages the editor understands (match the <select> in HTML)
-        _KNOWN_LANGS = {
-            "python", "javascript", "typescript", "html", "css", "richtext", "markdown", "json",
-            "yaml", "bash", "sql", "rust", "go", "java", "c", "cpp", "xml", "toml",
-            "ini", "ruby", "php", "csv", "email", "text", "plain", "svg",
-        }
-
-        # Try XML tag extraction first
-        title = None
-        language = None
-        content = None
-        mt = _re.search(r"<title>\s*(.*?)\s*</title>", raw, _re.DOTALL | _re.IGNORECASE)
-        ml = _re.search(r"<language>\s*(.*?)\s*</language>", raw, _re.DOTALL | _re.IGNORECASE)
-        mc = _re.search(r"<content>\s*(.*?)\s*</content>", raw, _re.DOTALL | _re.IGNORECASE)
-        if mt or mc:
-            title = mt.group(1).strip() if mt else None
-            language = ml.group(1).strip().lower() if ml else None
-            content = mc.group(1) if mc else None
-
-        # Fall back to line-based parsing. First strip any stray XML-ish tags.
-        if title is None or content is None:
-            cleaned = _re.sub(r"</?(?:title|language|content)>", "", raw)
-            lines = cleaned.strip().split("\n")
-            if title is None:
-                title = lines[0].strip() if lines else "Untitled"
-                lines = lines[1:]
-            # Only consume second line as language if it looks like a valid short lang token
-            if language is None and lines:
-                candidate = lines[0].strip().lower()
-                if candidate and len(candidate) < 20 and " " not in candidate and candidate in _KNOWN_LANGS:
-                    language = candidate
-                    lines = lines[1:]
-            if content is None:
-                content = "\n".join(lines)
-
-        # Validate language: must be in known set, else default based on content
-        if language and language not in _KNOWN_LANGS:
-            language = None
+        title, language, content = _parse_create_document(raw)
         if not language:
             # No explicit language — sniff it from the content so an SVG / HTML / JSON
             # / code document isn't silently saved as markdown. Prose → markdown.
@@ -613,6 +635,7 @@ class CreateDocumentTool:
 
             return {
                 "action": "create",
+                "exit_code": 0,
                 "doc_id": doc_id,
                 "title": title,
                 "language": language,

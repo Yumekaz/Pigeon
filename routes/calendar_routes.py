@@ -204,6 +204,7 @@ class EventCreate(BaseModel):
     all_day: bool = False
     description: str = ""
     location: str = ""
+    event_type: str = ""
     calendar_href: Optional[str] = None  # calendar id
     rrule: Optional[str] = None
     color: Optional[str] = None  # per-event color override
@@ -217,6 +218,7 @@ class EventUpdate(BaseModel):
     all_day: Optional[bool] = None
     description: Optional[str] = None
     location: Optional[str] = None
+    event_type: Optional[str] = None
     rrule: Optional[str] = None
     color: Optional[str] = None
     reminder_minutes: Optional[int] = None
@@ -1379,6 +1381,7 @@ def setup_calendar_routes(upload_handler=None) -> APIRouter:
                 summary=data.summary,
                 description=data.description,
                 location=data.location,
+                event_type=data.event_type or None,
                 dtstart=dtstart,
                 dtend=dtend,
                 all_day=data.all_day,
@@ -1438,6 +1441,8 @@ def setup_calendar_routes(upload_handler=None) -> APIRouter:
                 ev.description = data.description
             if data.location is not None:
                 ev.location = data.location
+            if data.event_type is not None:
+                ev.event_type = data.event_type or None
             if data.dtstart is not None:
                 ev.dtstart, _s_utc = _parse_dt_pair(data.dtstart)
                 # When the incoming payload carries tz info, mark the row as

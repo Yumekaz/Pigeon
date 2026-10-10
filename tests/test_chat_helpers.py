@@ -674,7 +674,7 @@ async def test_build_chat_context_keeps_cookie_user_owner_scope(monkeypatch):
     }
 
 
-async def _build_context_web_probe(monkeypatch, *, message, use_web, agent_mode):
+async def _build_context_web_probe(monkeypatch, *, message, use_web, agent_mode, continuation_context_message=None):
     captured = {"use_web": None}
 
     async def fake_preprocess(chat_handler, message, att_ids, sess, **kwargs):
@@ -738,6 +738,7 @@ async def _build_context_web_probe(monkeypatch, *, message, use_web, agent_mode)
         use_web=use_web,
         incognito=True,
         agent_mode=agent_mode,
+        continuation_context_message=continuation_context_message,
     )
     return captured
 
@@ -776,3 +777,13 @@ async def test_build_chat_context_skips_pre_web_for_agent_notes_turn(monkeypatch
     )
 
     assert captured["use_web"] is False
+
+
+@pytest.mark.asyncio
+async def test_approved_fetch_does_not_launch_another_automatic_search(monkeypatch):
+    captured = await _build_context_web_probe(
+        monkeypatch, message='Fetch https://docs.python.org/3/library/functions.html',
+        use_web='true', agent_mode=True,
+        continuation_context_message='Fetch https://docs.python.org/3/library/functions.html',
+    )
+    assert captured['use_web'] is False

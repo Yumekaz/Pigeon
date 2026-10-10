@@ -88,7 +88,7 @@ def test_defaults_everything_visible_except_default_off():
     assert m[TOOLS] is True
     assert m[CAL] is True
     assert m[NEWCHAT] is True
-    assert m[RAG] is False  # rag-toggle-btn is default-off
+    assert m[RAG] is True  # retrieval control is discoverable; retrieval itself stays opt-in
 
 
 def test_email_off_hides_email_and_its_rail_only():

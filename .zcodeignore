@@ -1,0 +1,162 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+!static/js/editor/build/
+venv/
+.venv/
+*.egg
+
+# Environment
+.env
+.env.bak.*
+!.env.example
+# Local uv lockfile (optional, per-platform — see "Faster installs with uv" in README)
+requirements.lock
+
+# SOPS workflow — encrypted `secrets.env` is intentionally committable,
+# but every variant (plaintext, manual decrypt copy, editor backup)
+# must stay out of git. Mirrored in .dockerignore so the same artifacts
+# also cannot enter image build layers.
+secrets.env.*
+!secrets.env.example
+
+# Data — all user data stays local
+data/
+# Local development runtime state
+.*-dev/
+!services/hwfit/data/
+!services/hwfit/data/hf_models.json
+logs/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# Node
+node_modules/
+services/node_modules/
+services/data/
+
+# IDE / Editor
+.aider*
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test capture artifacts (browser session dumps may contain personal content)
+.playwright-mcp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.cache
+cache/
+output.txt.txt
+
+# Media (uploaded/generated)
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.webp
+*.tiff
+*.pdf
+
+# …except shipped static assets
+!static/icons/*.png
+
+# …except shipped demo assets in docs/ that the README links to.
+!docs/*.jpg
+!docs/*.jpeg
+!docs/*.png
+!docs/*.gif
+!docs/*.webp
+# …and curated docs/ subfolder assets (e.g. accessibility before/after shots).
+!docs/**/*.png
+!docs/**/*.jpg
+!docs/**/*.gif
+!docs/**/*.webp
+
+# …except shipped website and branding media.
+!website/**/*.jpg
+!website/**/*.jpeg
+!website/**/*.png
+!website/**/*.gif
+!website/**/*.bmp
+!website/**/*.webp
+!website/**/*.tiff
+!website/**/*.pdf
+!assets/branding/**/*.jpg
+!assets/branding/**/*.jpeg
+!assets/branding/**/*.png
+!assets/branding/**/*.gif
+!assets/branding/**/*.bmp
+!assets/branding/**/*.webp
+!assets/branding/**/*.tiff
+!assets/branding/**/*.pdf
+
+# Reports and temp files
+reports/
+tasks/
+scripts/compound/*.json
+research_data/
+**/search_analytics.json
+
+# Internal dev/review notes — not for public repo
+dev-docs/
+# Windows-port working docs (local only, not for public repo)
+docs/windows-port/
+
+# Local config
+compound.config.json
+*.error.log
+_scratch/
+/upstream-source/
+
+# Local preview, recoverable source copies, and validation artifacts
+.preview-runtime/
+!static/branding/*.png
+!static/branding/*.webp
+
+# Test outputs and local planning records
+test-results/
+playwright-report/
+.pytest_cache/
+plans/
+specs/
+
+# ===== ↑ 以上同步自 .gitignore（「从 .gitignore 同步」只重写以上部分）=====
+.git/
+.hg/
+.svn/
+bower_components/
+jspm_packages/
+site-packages/
+coverage/
+htmlcov/
+lcov-report/
+cmakefiles/
+cmake-build-*/
+bazel-*/
+pods/
+deriveddata/
+storybook-static/
+allure-results/
+allure-report/
+cdk.out/
+*.dist-info/
+eggs/
+pip-wheel-metadata/
+wheels/
+# ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
+# 自定义规则写在下方（本行提示可删除）

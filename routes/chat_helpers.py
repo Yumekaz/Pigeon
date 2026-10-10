@@ -1140,6 +1140,7 @@ async def build_chat_context(
     # web searches before the agent even saw the tool surface.
     skip_web = (
         bool(search_context)
+        or bool(continuation_context_message)
         or not allow_tool_preprocessing
         or casual_low_signal
         or bool(agent_mode and _PERSONAL_TOOL_CONTEXT_RE.search(context_message or ""))

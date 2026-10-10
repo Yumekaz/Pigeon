@@ -109,12 +109,20 @@ function _rangeIsCached(start, end) {
 }
 
 function _filterPool(start, end) {
+  // Detail reads cache the recurrence master too. Display expanded occurrences
+  // rather than an extra master row on the first day of the series.
+  const expanded = new Set(Object.keys(_allEvents).filter(uid => uid.includes('::')).map(uid => uid.split('::')[0]));
   // Return all events in pool that overlap [start, end)
   return Object.values(_allEvents).filter(ev => {
+    if (ev.rrule && !String(ev.uid || '').includes('::') && expanded.has(ev.uid)) return false;
     const evStart = ev.all_day ? ev.dtstart : _localDateOf(ev.dtstart);
     const evEnd = ev.all_day ? ev.dtend : _localDateOf(ev.dtend || ev.dtstart);
     return evStart < end && evEnd >= start;
   }).sort((a, b) => a.dtstart < b.dtstart ? -1 : 1);
+}
+
+function _renderUnlessEditing() {
+  if (_open && !document.querySelector('#cal-body .cal-form')) _render();
 }
 
 async function _fetchEvents(start, end, force) {
@@ -139,11 +147,11 @@ async function _fetchEvents(start, end, force) {
       _events = _filterPool(start, end);
       if (typeof _saveCache === 'function') _saveCache();
       // Re-render in background when new data arrives (if calendar still open)
-      if (_open && hasCache) _render();
+      if (hasCache) _renderUnlessEditing();
     })
     .catch(e => { console.error('Calendar: failed to fetch events', e); });
   // If we have cache, don't block on fetch — return immediately so render is instant
-  if (hasCache) return;
+  if (hasCache && !force) return;
   // No cache — must await the fetch
   await fetchPromise;
 }
@@ -240,6 +248,7 @@ function _optimisticEvent(data, uid) {
     all_day: !!data.all_day,
     description: data.description || '',
     location: data.location || '',
+    event_type: data.event_type || '',
     rrule: data.rrule || '',
     calendar: cal?.name || '',
     calendar_href: data.calendar_href || cal?.href || '',
@@ -270,7 +279,7 @@ async function _createEvent(data) {
       delete _allEvents[tempUid];
       _allEvents[d.uid] = d.event || _optimisticEvent(data, d.uid);
       _saveCache && _saveCache();
-      if (_open) _render();
+      _renderUnlessEditing();
       return { uid: d.uid, event: _allEvents[d.uid], reminder: d.reminder };
     }
   } catch (e) {
@@ -2795,10 +2804,10 @@ function _wireAll(body) {
       // _render() — the calendar re-renders mid-flow — can't wipe it. Same
       // reason the spin is flag-driven.
       window._calSyncDone = true;
-      _render();
+      _renderUnlessEditing();
       setTimeout(() => {
         window._calSyncDone = false;
-        if (_open) _render();
+        _renderUnlessEditing();
       }, 900);
       if (uiModule?.showToast) uiModule.showToast('Calendar refreshed');
     }
@@ -3410,6 +3419,8 @@ function _parseTitleTime(text) {
 function _showEventForm(existing, defaultDate, defaultEndDate) {
   const body = document.getElementById('cal-body');
   if (!body) return;
+  const formToken = ++_renderToken;
+  let formDirty = false;
   _selectedWeekSlot = null;
   _modal?.classList.add('cal-navigation-hidden');
   const isEdit = !!existing;
@@ -3418,7 +3429,8 @@ function _showEventForm(existing, defaultDate, defaultEndDate) {
     _fetchEventByUid(uid, { force: true }).then(fresh => {
       if (!fresh || fresh === existing) return;
       fresh.__detailFresh = true;
-      if (document.querySelector('.cal-form') && document.getElementById('cal-f-sum')?.value === (existing.summary || '')) {
+      if (formToken === _renderToken && !formDirty && document.querySelector('.cal-form')
+          && document.getElementById('cal-f-sum')?.value === (existing.summary || '')) {
         _showEventForm(fresh, defaultDate, defaultEndDate);
       }
     }).catch(() => {});
@@ -3879,6 +3891,8 @@ function _showEventForm(existing, defaultDate, defaultEndDate) {
   });
   // ── Bespoke-form behavior ──────────────────────────────────────────
   const formEl = body.querySelector('.cal-form');
+  formEl?.addEventListener('input', () => { formDirty = true; });
+  formEl?.addEventListener('change', () => { formDirty = true; });
   const detailsEl = document.getElementById('cal-form-details');
   const titleInput = document.getElementById('cal-f-sum');
 

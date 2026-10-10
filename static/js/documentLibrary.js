@@ -11,6 +11,7 @@ import spinnerModule from './spinner.js';
 import markdownModule from './markdown.js';
 import { makeWindowDraggable } from './windowDrag.js';
 import { langIcon } from './langIcons.js?v=20260831richtexttools91';
+import { utcTimestampDate } from './utcTimestamp.js';
 import {
   registerMenuDismiss,
   dismissOrRemove,
@@ -424,7 +425,8 @@ function _setLibraryCountChipContent(chip, label, count) {
   function libraryRelativeTime(isoString) {
     if (!isoString) return '';
     const now = Date.now();
-    const then = new Date(isoString).getTime();
+    const then = utcTimestampDate(isoString).getTime();
+    if (!Number.isFinite(then)) return '';
     const diffS = Math.floor((now - then) / 1000);
     if (diffS < 60) return 'just now';
     const diffM = Math.floor(diffS / 60);
@@ -436,7 +438,7 @@ function _setLibraryCountChipContent(chip, label, count) {
     if (diffD < 14) return diffD + 'd ago';
     const diffW = Math.floor(diffD / 7);
     if (diffW < 8) return diffW + 'w ago';
-    return new Date(isoString).toLocaleDateString();
+    return utcTimestampDate(isoString).toLocaleDateString();
   }
 
   async function libraryFetch(append) {
@@ -3427,14 +3429,17 @@ function _setLibraryCountChipContent(chip, label, count) {
 
     function _relTime(iso) {
       if (!iso) return '';
-      const diff = Date.now() - new Date(iso).getTime();
+      const timestamp = utcTimestampDate(iso).getTime();
+      if (!Number.isFinite(timestamp)) return '';
+      const diff = Date.now() - timestamp;
       const mins = Math.floor(diff / 60000);
+      if (mins < 1) return 'just now';
       if (mins < 60) return mins + 'm ago';
       const hrs = Math.floor(mins / 60);
       if (hrs < 24) return hrs + 'h ago';
       const days = Math.floor(hrs / 24);
       if (days < 30) return days + 'd ago';
-      return new Date(iso).toLocaleDateString();
+      return utcTimestampDate(iso).toLocaleDateString();
     }
 
     // Switch to the initial tab. Always call this — even when the

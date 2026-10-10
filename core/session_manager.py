@@ -747,8 +747,14 @@ class SessionManager:
         overwrite an existing in-memory session. The task scheduler must
         use this instead of direct dict assignment.
         """
-        if session_id in self.sessions:
-            return self.sessions[session_id]
+        try:
+            existing = self.get_session(session_id)
+        except KeyError:
+            existing = None
+        if existing is not None:
+            if getattr(existing, 'owner', None) != owner:
+                raise PermissionError('Task output session belongs to another owner')
+            return existing
 
         session = self.create_session(session_id, name, endpoint_url, model, owner=owner)
         if task is not None:

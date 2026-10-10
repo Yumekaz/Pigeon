@@ -707,6 +707,7 @@ _EXTERNAL_MESSAGE_SOURCE_PREFIXES = ("web page:",)
 _CONTROL_PLANE_CONTEXT_SOURCES = frozenset(
     {
         "skills",
+        "available skills index",
         "client runtime context",
         "backend runtime context",
         "integrations",
@@ -717,6 +718,8 @@ _CONTROL_PLANE_CONTEXT_SOURCES = frozenset(
         "email writing style",
         "current chat uploaded files",
         "saved memory: minimal context",
+        "saved memory: pinned context",
+        "saved memory: retrieved context",
         "recent tool context",
     }
 )

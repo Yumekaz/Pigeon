@@ -171,6 +171,9 @@ def _completion_answer(text: str, ledger: EvidenceLedger, decision: CompletionDe
     incomplete = decision.reason if not decision.can_complete and decision.status != CompletionStatus.AWAITING_USER else ''
     execution_required = _execution_obligation(ledger.requirements)
     prose, removed = _supported_prose(text, ledger, decision)
+    if removed and decision.status == CompletionStatus.AWAITING_USER:
+        notice = 'Waiting for your response before continuing.'
+        return notice + ('\n\n' + prose if prose.strip() else ''), removed
     if incomplete or (removed and execution_required and decision.status in {CompletionStatus.UNVERIFIED, CompletionStatus.AWAITING_USER}):
         reason = incomplete or removed
         missing = (' Missing artifacts: ' + ', '.join(decision.missing_artifacts) + '.'
@@ -187,12 +190,14 @@ def _completion_answer(text: str, ledger: EvidenceLedger, decision: CompletionDe
     if decision.can_complete and (ledger.requirements.required_artifacts or ledger.requirements.verifier_required or removed):
         facts = []
         if ledger.requirements.required_artifacts:
-            facts.append('Output available: ' + ', '.join(ledger.requirements.required_artifacts) + '.')
+            label = ('Document saved: ' if ledger.requirements.document_artifacts
+                     == ledger.requirements.required_artifacts else 'Output available: ')
+            facts.append(label + ', '.join(ledger.requirements.required_artifacts) + '.')
         if decision.status == CompletionStatus.VERIFIED or ledger._supports_verifier_claim():
             facts.append('The latest executable verification passed.')
         elif any(e.kind == EvidenceKind.ARTIFACT_VALIDATION and e.authoritative and e.success for e in ledger.events):
             facts.append('Artifact readback verified. No passing executable test result was recorded.')
-        else:
+        elif not ledger.requirements.document_artifacts:
             facts.append('No passing executable test result was recorded.')
         summary = ' '.join(facts)
         return (prose.rstrip() + '\n\n' + summary) if prose.strip() else summary, removed
@@ -269,7 +274,8 @@ def with_completion_gate(func):
                         declared = (data.get('data') or {}).get('completion_requirements')
                         awaiting |= bool((data.get('data') or {}).get('missing_workspace'))
                         if isinstance(declared, dict):
-                            requirements = requirements_from_runtime_context({'completion_requirements': declared})
+                            requirements = requirements_from_runtime_context(
+                                {'completion_requirements': declared}, _server_declared=True)
                             requirements = replace(requirements, workspace_root=trusted_workspace or '')
                             # New obligations affect future receipts only. Never
                             # backfill historical versions with present bytes.
@@ -332,8 +338,18 @@ def with_completion_gate(func):
             ledger = _ledger(journal, requirements)
             decision = ledger.evaluate(exhausted=exhausted, awaiting_user=awaiting)
             if provider_error:
+                local_budget_block = False
+                for line in provider_error.splitlines():
+                    if line.startswith('data: '):
+                        try:
+                            local_budget_block = json.loads(line[6:]).get('origin') == 'pigeon_budget_guard'
+                        except (ValueError, TypeError, AttributeError):
+                            pass
+                        break
                 decision = replace(decision, status=CompletionStatus.FAILED,
-                                   can_complete=False, reason='Model request failed')
+                                   can_complete=False, reason=(
+                                       'PIGEON local test budget blocked the next request'
+                                       if local_budget_block else 'Model request failed'))
             # Exhaustion limits execution; factual source synthesis can remain
             # useful and must not be replaced merely because the budget ended.
             presentation_decision = ledger.evaluate(awaiting_user=awaiting) if exhausted and not provider_error else decision

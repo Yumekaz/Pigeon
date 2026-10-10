@@ -3071,7 +3071,10 @@ def setup_chat_routes(
                         # the explicit signal. We just log the mismatch and
                         # re-bind the doc to the current session for ownership
                         # and document-history continuity.
-                        if doc_session and doc_session != session:
+                        # Approval has sealed this record's linked chat and
+                        # revision. Rebinding here would invalidate our own
+                        # captured identity before the approved read executes.
+                        if doc_session and doc_session != session and not tool_approval_continuation:
                             logger.info(
                                 "[doc-inject] cross-session active_doc_id %s (was session %s, now %s) — accepting and rebinding",
                                 active_doc_id, doc_session, session,

@@ -1851,6 +1851,7 @@ function initializeEventListeners() {
       if (btn.style.display === 'none') return;
       const on = loadToolPref(stateKey, mode);
       btn.classList.toggle('active', on);
+      btn.setAttribute('aria-pressed', String(on));
       if (checkboxId) { const chk = el(checkboxId); if (chk) chk.checked = on; }
     });
   }

@@ -2143,7 +2143,7 @@ function _isFinishedRun(entry) {
 }
 
 function _isChatResultRun(entry) {
-  return _isFinishedRun(entry)
+  return ['success', 'completed'].includes(entry.status)
     && (entry.kind === 'llm' || entry.kind === 'research')
     && !!(entry.result || '').trim();
 }
@@ -2892,7 +2892,7 @@ function _renderActivityEntry(entry, opts = {}) {
   // task controls. It is specifically for queued runs waiting on the model
   // idle gate; completed rows retain the normal "Run again" action.
   const waitingForIdle = /waiting\s+for\s+.*?to\s+be\s+idle/i.test(String(entry.result || ''));
-  if (entry.taskId && (_isRunning && entry.status === 'queued' || waitingForIdle)) {
+  if (entry.taskId && _isRunning && (entry.status === 'queued' || waitingForIdle)) {
       actionBtn += `<button class="task-log-run-again task-log-force-run task-log-force-run-action" type="button" title="Run anyway, even while PIGEON is busy">
          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
          Run anyway

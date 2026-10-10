@@ -156,7 +156,7 @@ def payload_for(body):
     if type(requested) is not int or requested < 1:
         raise ValueError("Invalid output limit")
     payload = {"model": MODEL, "input": items, "reasoning": {"effort": "none"},
-               "max_output_tokens": min(requested, MAX_OUTPUT), "store": False,
+               "max_output_tokens": max(16, min(requested, MAX_OUTPUT)), "store": False,
                "service_tier": "default"}
     if tools:
         payload["tools"] = tools

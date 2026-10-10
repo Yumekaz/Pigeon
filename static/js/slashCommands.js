@@ -919,7 +919,7 @@ function _syncToggleUI(name, state) {
 }
 
 async function _quickToggle(name) {
-  const toggleMap = { web: 'web-toggle', bash: 'bash-toggle', research: 'research-toggle' };
+  const toggleMap = { web: 'web-toggle', bash: 'bash-toggle', research: 'research-toggle', rag: 'rag-toggle' };
   const chk = document.getElementById(toggleMap[name]);
   if (!chk) return false;
   chk.checked = !chk.checked;
@@ -5793,6 +5793,7 @@ const COMMANDS = {
       'bash':      { handler: _cmdToggleBash,      alias: ['b','shell'],       help: 'Toggle bash/shell',       usage: '/toggle bash' },
       'research':  { handler: _cmdToggleResearch,  alias: ['r'],               help: 'Toggle deep research',    usage: '/toggle research' },
       'doc':       { handler: _cmdToggleDoc,       alias: [],     help: 'Toggle document editor',  usage: '/toggle doc' },
+      'rag':       { handler: _cmdToggleRag,       alias: [],     help: 'Toggle personal document retrieval', usage: '/toggle rag [on|off]' },
       'sidebar':   { handler: _cmdToggleSidebar,   alias: ['sb'], help: 'Cycle sidebar (full/mini/off)', usage: '/toggle sidebar [1|2|3]' },
       '_show':     { handler: _cmdToggleShow,      alias: [],     help: 'Show all toggle states',  usage: '/toggle' }
     }
@@ -5839,6 +5840,8 @@ const COMMANDS = {
     default: 'list',
     subs: {
       'list':   { handler: _cmdRagList,   alias: ['ls'],       help: 'List indexed files',    usage: '/rag list' },
+      'on':     { handler: (args, ctx) => _cmdToggleRag(['on'], ctx), alias: [], help: 'Enable personal document retrieval', usage: '/rag on' },
+      'off':    { handler: (args, ctx) => _cmdToggleRag(['off'], ctx), alias: [], help: 'Disable personal document retrieval', usage: '/rag off' },
       'add':    { handler: _cmdRagAdd,    alias: [],           help: 'Add directory',         usage: '/rag add /path' },
       'remove': { handler: _cmdRagRemove, alias: ['rm'],       help: 'Remove directory',      usage: '/rag remove /path' }
     }

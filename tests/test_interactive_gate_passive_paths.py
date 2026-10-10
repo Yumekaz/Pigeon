@@ -17,3 +17,7 @@ def test_real_interactive_paths_still_tracked():
 def test_options_never_tracked():
     assert should_track_interactive_request("/api/email/unread-state", method="OPTIONS") is False
     assert should_track_interactive_request("/api/chat_stream", method="OPTIONS") is False
+
+
+def test_notification_logging_does_not_cancel_tasks():
+    assert should_track_interactive_request('/api/tasks/notification-logs', method='POST') is False

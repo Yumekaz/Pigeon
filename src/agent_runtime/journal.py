@@ -30,6 +30,7 @@ class ActionReceipt:
     outcome: dict[str, Any] | None = None
     artifact_versions: dict[str, str] = field(default_factory=dict)
     artifact_changes: list[str] | None = None
+    document_artifacts: tuple[str, ...] = ()
 
     def transition(self, stage: str, **details: Any) -> None:
         self.transitions.append({'sequence': len(self.transitions), 'stage': stage, **details})
@@ -55,6 +56,14 @@ class ActionReceipt:
             'blocked': denied,
             'output_sha256': digest(result.get('output') or result.get('error') or result.get('stdout') or ''),
         }
+        # The committed document producer returns its owned identity and name.
+        # Arguments alone cannot attest that a named document was saved.
+        if (self.tool == 'create_document' and self.outcome['authoritative']
+                and self.outcome['success'] and isinstance(result.get('doc_id'), str)
+                and result['doc_id'] and isinstance(result.get('title'), str)
+                and result['title'] and type(result.get('version')) is int
+                and result['version'] > 0):
+            self.document_artifacts = (result['title'],)
         self.transition('outcome', **self.outcome)
 
     def to_dict(self) -> dict[str, Any]:
@@ -139,7 +148,8 @@ class ActionJournal:
                      execution_attempted=bool((a.outcome or {}).get('authoritative')),
                      blocked=(a.outcome or {}).get('blocked', False),
                      action_id=a.action_id, execution_id=a.execution_id,
-                     artifact_versions=a.artifact_versions, artifact_changes=a.artifact_changes)
+                     artifact_versions=a.artifact_versions, artifact_changes=a.artifact_changes,
+                     document_artifacts=a.document_artifacts)
                 for a in self.actions if a.outcome is not None]
 
 

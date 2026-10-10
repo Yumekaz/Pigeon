@@ -7,7 +7,7 @@
 //   - Other static assets (images/fonts/libs): cache-first with bg refresh.
 //   - API / non-GET: never cached.
 // Bump CACHE_NAME whenever the precache list or SW logic changes.
-const CACHE_NAME = 'pigeon-v5';
+const CACHE_NAME = 'pigeon-v7';
 
 // KaTeX resolves these from its own stylesheet, so caching the CSS without them
 // gives offline math fallback glyphs instead of proper typesetting.
@@ -88,6 +88,8 @@ const PRECACHE = [
   '/static/js/spinner.js',
   '/static/js/tts-ai.js',
   '/static/js/document.js?v=20260916docctx2',
+  '/static/js/documentLibrary.js',
+  '/static/js/utcTimestamp.js',
   '/static/js/gallery.js?v=20260910promptcopy1',
   '/static/js/chatRenderer.js?v=20260914metricssummary1',
   '/static/js/codeRunner.js?v=20260831richtexttools91',

@@ -11,6 +11,7 @@ from __future__ import annotations
 import ipaddress
 import socket
 import ssl
+import time
 from typing import Callable, Iterable, cast
 from urllib.parse import urljoin, urlparse
 
@@ -119,8 +120,8 @@ def _resolve_public_ips(
 class _PinnedBackend(httpcore.NetworkBackend):
     """Network backend that connects to a pre-resolved IP."""
 
-    def __init__(self, ip: ipaddress._BaseAddress):
-        self._ip = str(ip)
+    def __init__(self, ip: ipaddress._BaseAddress, *, fallback_ips=()):
+        self._ips = tuple(dict.fromkeys(str(address) for address in (ip, *fallback_ips)))
         self._real = httpcore.SyncBackend()
 
     def connect_tcp(
@@ -131,9 +132,19 @@ class _PinnedBackend(httpcore.NetworkBackend):
         local_address: str | None = None,
         socket_options=None,
     ):
-        return self._real.connect_tcp(
-            self._ip, port, timeout, local_address, socket_options
-        )
+        deadline = time.monotonic() + timeout if timeout is not None else None
+        for index, address in enumerate(self._ips):
+            remaining = max(0, deadline - time.monotonic()) if deadline is not None else None
+            # Give every prevalidated address a chance within the original
+            # connect deadline, including IPv4 on hosts with broken IPv6.
+            attempt_timeout = remaining / (len(self._ips) - index) if remaining is not None else None
+            try:
+                return self._real.connect_tcp(
+                    address, port, attempt_timeout, local_address, socket_options
+                )
+            except (httpcore.ConnectError, httpcore.ConnectTimeout):
+                if index == len(self._ips) - 1:
+                    raise
 
     def connect_unix_socket(self, path, timeout=None, socket_options=None):
         return self._real.connect_unix_socket(path, timeout, socket_options)
@@ -163,12 +174,12 @@ _HTTPCORE_TO_HTTPX_EXC = {
 class _PinnedTransport(httpx.BaseTransport):
     """Transport that pins every TCP connect to a pre-resolved IP."""
 
-    def __init__(self, ip: ipaddress._BaseAddress, *, http2: bool = False):
+    def __init__(self, ip: ipaddress._BaseAddress, *, http2: bool = False, fallback_ips=()):
         self._pool = httpcore.ConnectionPool(
             ssl_context=ssl.create_default_context(),
             http1=True,
             http2=http2,
-            network_backend=_PinnedBackend(ip),
+            network_backend=_PinnedBackend(ip, fallback_ips=fallback_ips),
         )
 
     def __enter__(self):
@@ -209,6 +220,32 @@ class _PinnedTransport(httpx.BaseTransport):
 
     def close(self) -> None:
         self._pool.close()
+
+
+class _AddressFallbackTransport(httpx.BaseTransport):
+    """Retry a read-only GET across one prevalidated DNS result set."""
+
+    def __init__(self, ips, timeout):
+        self._ips = tuple(dict.fromkeys(ips))
+        self._timeout = timeout
+
+    def handle_request(self, request):
+        deadline = time.monotonic() + self._timeout
+        for index, address in enumerate(self._ips):
+            remaining = max(0, deadline - time.monotonic())
+            attempt_timeout = remaining / (len(self._ips) - index)
+            extensions = dict(request.extensions)
+            extensions['timeout'] = {phase: attempt_timeout for phase in ('connect', 'read', 'write', 'pool')}
+            attempt = httpx.Request(request.method, request.url,
+                                    headers=request.headers, content=b'', extensions=extensions)
+            try:
+                with _PinnedTransport(address) as transport:
+                    return transport.handle_request(attempt)
+            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout):
+                # TLS/response timeouts can follow a successful TCP connect.
+                # Retry only this GET, never a new DNS resolution or private IP.
+                if index == len(self._ips) - 1:
+                    raise
 
 
 class BodyTooLargeError(Exception):
@@ -280,18 +317,19 @@ def _get_public_url(
 ) -> _CappedFetch:
     """Capped streaming GET with SSRF-guarded, DNS-pinned redirects."""
     resolve_public_ips = resolve_public_ips or _resolve_public_ips
-    transport_factory = transport_factory or _PinnedTransport
     cap = min(max_bytes or WEB_FETCH_SOFT_MAX_BYTES, WEB_FETCH_HARD_MAX_BYTES)
     current = url
     for _ in range(max_redirects + 1):
         ips = resolve_public_ips(current)
         req_headers = dict(headers or {})
+        transport = (transport_factory(ips[0]) if transport_factory is not None
+                     else _AddressFallbackTransport(ips, timeout))
 
         with httpx.Client(
             headers=req_headers,
             timeout=timeout,
             follow_redirects=False,
-            transport=transport_factory(ips[0]),
+            transport=transport,
         ) as client:
             with client.stream("GET", current) as response:
                 if response.status_code in (301, 302, 303, 307, 308):

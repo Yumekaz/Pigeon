@@ -4952,6 +4952,10 @@ import { invalidateSettings } from './appConfig.js';
                        'ai_draft_email_reply', 'mcp__email__ai_draft_email_reply'].includes(json.tool)
                       && documentModule.loadDocument) {
                     documentModule.loadDocument(json.doc_id);
+                  } else if (typeof json.document_content !== 'string') {
+                    // Older/minimal tool results carry only an id. Fetch the
+                    // saved document rather than overwriting it with blank text.
+                    documentModule.loadDocument?.(json.doc_id);
                   } else {
                     documentModule.handleDocUpdate({
                       type: 'doc_update',

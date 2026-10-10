@@ -2,6 +2,7 @@
 
 import uiModule from './ui.js?v=20260916largetoolscroll1';
 import sessionModule from './sessions.js';
+import { utcTimestampDate } from './utcTimestamp.js';
 
 let API_BASE = '';
 let debounceTimer = null;
@@ -77,7 +78,8 @@ function highlightMatch(text, query) {
 
 function formatTimestamp(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
+  const d = utcTimestampDate(iso);
+  if (Number.isNaN(d.getTime())) return '';
   const now = new Date();
   const diff = now - d;
   if (diff < 86400000) {

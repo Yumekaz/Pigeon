@@ -3803,12 +3803,14 @@ def recent_source_reference_context(group):
 
 def conversation(history_session, messages, *, owner=None, diagnostics=None):
     """Retain complete native call/result groups from server-owned turn metadata."""
-    # These are current-turn, owner-scoped memories selected upstream. Do not
-    # recover them from old traces: memory may now be disabled or deleted.
-    memory_context = [copy.deepcopy(message) for message in messages
+    # These are current-turn, owner-scoped sources selected upstream. Do not
+    # recover them from old traces: memory/retrieval may now be disabled or
+    # the source may have been deleted. Keep their untrusted wrappers intact.
+    source_context_messages = [copy.deepcopy(message) for message in messages
                       if message.get('role') == 'user'
                       and (message.get('metadata') or {}).get('source') in {
                           'saved memory: pinned context', 'saved memory: retrieved context',
+                          'retrieved documents',
                       }
                       and (message.get('metadata') or {}).get('trusted') is False]
     groups = []
@@ -3867,7 +3869,7 @@ def conversation(history_session, messages, *, owner=None, diagnostics=None):
         group[0].pop('_attachment_metadata', None)
     if source_context:
         groups[-1].insert(0, source_context)
-    return memory_context + [m for group in groups for m in group]
+    return source_context_messages + [m for group in groups for m in group]
 
 
 def event(value):

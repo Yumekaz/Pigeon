@@ -250,6 +250,16 @@ _META_SEARCH_QUERIES = {
 }
 
 
+def _requested_report_word_limit(question: str) -> Optional[int]:
+    """Recognize an explicit upper word bound without imposing one by default."""
+    limits = re.findall(
+        r'\b(?:under|at\s+most|up\s+to|no\s+more\s+than|maximum(?:\s+of)?|max)\s+'
+        r'(\d{1,5})\s*words?\b', str(question or ''), re.I,
+    )
+    positive = [int(value) for value in limits if int(value) > 0]
+    return min(positive) if positive else None
+
+
 _PRODUCT_NOUNS = (
     "camera", "computer", "gpu", "hardware", "headphone", "laptop",
     "monitor", "phone", "router", "speaker", "tablet", "tv",
@@ -1770,6 +1780,7 @@ class DeepResearcher:
     # ------------------------------------------------------------------
     async def _final_report(self, question: str, report: str) -> str:
         """LLM writes a polished final report, retrying if too short."""
+        word_limit = _requested_report_word_limit(question)
         cat_extra = CATEGORY_PROMPTS.get(self.category or "", "")
         prompt = FINAL_REPORT_PROMPT.format(
             question=question,
@@ -1780,6 +1791,18 @@ class DeepResearcher:
         )
         if cat_extra:
             prompt += "\n\n" + cat_extra
+        if word_limit is not None:
+            # An explicit short deliverable must not inherit the default
+            # magazine-length requirements or trigger a paid expansion pass.
+            prompt = (
+                f"Write a complete research report of at most {word_limit} words. "
+                f"Format: {self.category or 'standard'}. For a fact-check, include "
+                "the verdict, evidence and a brief caveat. Cite observed source "
+                "URLs inline. Answer only from collected evidence; do not invent "
+                "facts or corroboration. Keep the ending complete.\n\n"
+                f"Question: {question}\n\nCollected evidence and analysis:\n{report}\n\n"
+                f"Source state:\n{self._source_state_summary()}"
+            )
 
         try:
             result = await self._llm(
@@ -1790,7 +1813,7 @@ class DeepResearcher:
             )
 
             # If report is too short, ask the LLM to expand it
-            if len(result.split()) < 400:
+            if word_limit is None and len(result.split()) < 400:
                 logger.info(f"Final report too short ({len(result.split())} words), requesting expansion")
                 self._emit(phase="writing", message="Expanding report...")
                 expanded = await self._llm(

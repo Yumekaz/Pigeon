@@ -1221,7 +1221,7 @@ body[class^="standard-report-"] .report-section:nth-of-type(even) {{
 }}
 .research-trace > summary::-webkit-details-marker {{ display: none; }}
 .research-trace > summary::before {{
-  content: '\25B6';
+  content: '\\25B6';
   color: var(--text-muted);
   font-size: 0.65em;
   transition: transform 0.2s;

@@ -56,7 +56,10 @@ def _get_public_url(url, headers, timeout, max_redirects=5, max_bytes=None):
         max_redirects=max_redirects,
         max_bytes=max_bytes,
         resolve_public_ips=_resolve_public_ips,
-        transport_factory=_PinnedTransport,
+        # Use the shared validated-address fallback in production. Keep the
+        # legacy injectable single-address seam for extraction tests.
+        transport_factory=(None if _PinnedTransport is _outbound_fetch._PinnedTransport
+                           else _PinnedTransport),
     )
 
 

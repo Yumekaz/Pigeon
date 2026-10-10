@@ -1,11 +1,30 @@
 """Private filesystem defaults established before application imports."""
 
 import os
+import logging
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
+
+
+def _close_runtime_file_handlers(root):
+    """Release only this runtime's log files before Windows removes it."""
+    owned_root = Path(root).resolve()
+    loggers = [logging.getLogger()] + [
+        logger for logger in logging.Logger.manager.loggerDict.values()
+        if isinstance(logger, logging.Logger)
+    ]
+    closing = set()
+    for logger in loggers:
+        for handler in list(logger.handlers):
+            if (isinstance(handler, logging.FileHandler)
+                    and Path(handler.baseFilename).resolve().is_relative_to(owned_root)):
+                logger.removeHandler(handler)
+                closing.add(handler)
+    for handler in closing:
+        handler.close()
 
 
 def bootstrap_runtime():
@@ -68,4 +87,7 @@ def isolated_runtime(worker="main"):
                 patcher.setenv(name, str(tmp))
             # tempfile may already have cached the caller's directory.
             patcher.setattr(tempfile, "tempdir", str(tmp))
-            yield root
+            try:
+                yield root
+            finally:
+                _close_runtime_file_handlers(root)

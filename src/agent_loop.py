@@ -23951,7 +23951,7 @@ async def stream_agent_loop(
                 budget_is_explicit,
                 hard_max=hard_max,
             )
-            if candidate_context <= 8192:
+            if 0 < candidate_context <= 8192:
                 # Small local servers often tokenize chat wrappers and tool
                 # results much more generously than our rough estimator. Keep
                 # substantial headroom for those wrappers and generation so a
@@ -25652,6 +25652,8 @@ async def stream_agent_loop(
         if approved_result.get("doc_id"):
             approved_tool_event["doc_id"] = approved_result["doc_id"]
             approved_tool_event["doc_title"] = approved_result.get("title", "")
+            from src.agent_tools.document_tools import document_tool_event_metadata
+            approved_tool_event.update(document_tool_event_metadata(approved_result))
         tool_events.append(approved_tool_event)
         if approved.tool_name in _VERIFIER_EFFECTFUL_TOOLS:
             _effectful_used = True
@@ -35051,6 +35053,8 @@ async def stream_agent_loop(
             if result.get("doc_id"):
                 tool_event["doc_id"] = result["doc_id"]
                 tool_event["doc_title"] = result.get("title", "")
+                from src.agent_tools.document_tools import document_tool_event_metadata
+                tool_event.update(document_tool_event_metadata(result))
             if block.tool_type == "manage_calendar":
                 if result.get("uid"):
                     tool_event["uid"] = result.get("uid")

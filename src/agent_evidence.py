@@ -79,11 +79,17 @@ class CompletionRequirements:
     # successful tool event is not enough: the declared artifact must also
     # exist in this workspace at completion time.
     workspace_root: str = ""
+    document_artifacts: tuple[str, ...] = ()
+    document_output_mode: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["required_artifacts"] = list(self.required_artifacts)
         data["verifier_commands"] = list(self.verifier_commands)
+        data["document_artifacts"] = list(self.document_artifacts)
+        if not self.document_output_mode and not self.document_artifacts:
+            data.pop("document_artifacts")
+            data.pop("document_output_mode")
         return data
 
 
@@ -226,6 +232,16 @@ def _artifact_match_is_negated(instruction: str, match: re.Match[str]) -> bool:
     return bool(re.search(r"(?:do\s+not|don't|must\s+not|never)\s+$", prefix, re.IGNORECASE))
 
 
+def _artifact_match_is_saved_read_reference(instruction: str, match: re.Match[str]) -> bool:
+    """A saved/created document being listed or read is an input, not output."""
+    if not re.match(r'(?:saved|written|created|generated|exported|produced|made|placed)\b',
+                    match.group(), re.I):
+        return False
+    prefix = instruction[max(0, match.start() - 120):match.start()]
+    return bool(re.search(r'\b(?:list|read|open|find|search|show|inspect|quote|summari[sz]e)\b'
+                          r'[^.;\n]{0,100}$', prefix, re.I))
+
+
 def _artifact_match_is_callable(instruction: str, match: re.Match[str], path: str) -> bool:
     """Reject dotted callable names such as ``json.dumps(...)`` as artifacts."""
 
@@ -245,6 +261,16 @@ def _artifact_match_is_email_host(instruction: str, match: re.Match[str]) -> boo
     start = match.start("path")
     prefix = instruction[max(0, start - 80):start]
     return bool(re.search(r"[A-Za-z0-9_.+-]+@$", prefix))
+
+
+def _artifact_match_is_version_reference(instruction: str, match: re.Match[str], path: str) -> bool:
+    if not re.fullmatch(r'\d+(?:\.\d+)+', path):
+        return False
+    prefix = instruction[max(0, match.start('path') - 60):match.start('path')]
+    return bool(re.search(
+        r'\b(?:version|release|haiku|sonnet|opus|claude|gemini|luna|gpt|python|node(?:\.js)?)\s+$',
+        prefix, re.I,
+    ))
 
 
 def _workspace_path_identity(value: str) -> str:
@@ -349,9 +375,13 @@ def infer_completion_requirements(
             path = _clean_path(match.group("path"))
             if _artifact_match_is_negated(text, match):
                 continue
+            if _artifact_match_is_saved_read_reference(text, match):
+                continue
             if _artifact_match_is_callable(text, match, path):
                 continue
             if _artifact_match_is_email_host(text, match):
+                continue
+            if _artifact_match_is_version_reference(text, match, path):
                 continue
             if path and not _is_prose_abbreviation(path) and path not in paths:
                 paths.append(path)
@@ -410,6 +440,12 @@ def infer_completion_requirements(
             re.IGNORECASE,
         ))
     )
+    from src.turn_contract import standalone_code_request
+    document_output = standalone_code_request(text) or bool(
+        re.search(r'\b(?:create|make|generate|write|save)\b[^\n]{0,180}'
+                  r'\b(?:new\s+(?:HTML\s+)?document|document\s+editor|document\s+(?:named|titled))\b',
+                  text, re.I)
+    )
     return CompletionRequirements(
         required_artifacts=tuple(paths),
         verifier_required=verifier_required,
@@ -417,6 +453,8 @@ def infer_completion_requirements(
             executable_verifier_available or bool(cleaned_verifier_commands) or bool(explicit_test_request)
         ),
         verifier_commands=cleaned_verifier_commands,
+        document_artifacts=tuple(paths) if document_output else (),
+        document_output_mode=document_output,
     )
 
 
@@ -424,6 +462,7 @@ def requirements_from_runtime_context(
     context: Mapping[str, Any] | None,
     *,
     instruction: str = "",
+    _server_declared: bool = False,
 ) -> CompletionRequirements:
     runtime_context = context or {}
     known_inputs: list[str] = []
@@ -472,6 +511,15 @@ def requirements_from_runtime_context(
         for command in verifier_commands
         if str(command or "").strip()
     ))
+    inferred = infer_completion_requirements(instruction)
+    declared_documents = raw.get('document_artifacts')
+    if not isinstance(declared_documents, (list, tuple)):
+        declared_documents = ()
+    # A generator's sanitized contract may cross the completion boundary after
+    # approval. Preserve its output kind; ordinary client metadata cannot set it.
+    document_mode = (raw.get('document_output_mode') is True if _server_declared
+                     else inferred.document_output_mode)
+    document_paths = declared_documents if _server_declared else inferred.document_artifacts
     return CompletionRequirements(
         required_artifacts=cleaned,
         verifier_required=bool(raw.get("verifier_required")),
@@ -481,6 +529,8 @@ def requirements_from_runtime_context(
         ),
         verifier_commands=cleaned_verifier_commands,
         workspace_root=_clean_path(str(raw.get("workspace_root") or "")),
+        document_artifacts=tuple(path for path in cleaned if document_mode and path in document_paths),
+        document_output_mode=document_mode,
     )
 
 
@@ -846,6 +896,11 @@ class EvidenceLedger:
 
         explicit_paths = _explicit_tool_paths(tool, command)
         mutation_paths = list(explicit_paths)
+        if tool == 'create_document' and authoritative and success and self.requirements.document_output_mode:
+            document_outputs = event.get('document_artifacts')
+            if isinstance(document_outputs, (list, tuple)):
+                mutation_paths.extend(path for path in document_outputs
+                    if isinstance(path, str))
         observed_changes = event.get('artifact_changes')
         if isinstance(observed_changes, list) and tool in {'bash', 'python', 'host_shell'}:
             mutation_paths.extend(path for path in self.requirements.required_artifacts
@@ -957,6 +1012,7 @@ class EvidenceLedger:
             return False
         for path in targets:
             matching = [event for event in self.events if event.kind == kind and event.authoritative
+                        and (path not in self.requirements.document_artifacts or event.tool == 'create_document')
                         and _artifact_path_matches_required(event.artifact_path, path, self.requirements.workspace_root)]
             successful = [event for event in matching if event.success]
             # Match evaluate(): atomic helper failures preserve the previous
@@ -1083,6 +1139,7 @@ class EvidenceLedger:
             matches = [
                 event for event in self.events
                 if event.kind == EvidenceKind.ARTIFACT_MUTATION
+                and (required not in self.requirements.document_artifacts or event.tool == 'create_document')
                 and _artifact_path_matches_required(event.artifact_path, required, self.requirements.workspace_root)
             ]
             authoritative = [
@@ -1102,7 +1159,8 @@ class EvidenceLedger:
                 and latest.tool in {"bash", "python"}
             )
             filesystem_missing = False
-            if latest_success is not None and workspace_root:
+            if (latest_success is not None and workspace_root
+                    and required not in self.requirements.document_artifacts):
                 try:
                     root = Path(workspace_root).resolve()
                     identity = artifact_identity(required, workspace_root)

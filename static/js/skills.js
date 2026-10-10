@@ -243,8 +243,8 @@ function _renderSkillsSummary() {
   const chips = [
     _summaryChip('all', 'All', skills.length, 'Show all skills'),
     _summaryChip('builtin', 'Built-in', skills.length - userSkills.length, 'Shipped procedures'),
-    _summaryChip('approved', 'Approved', m.approved, 'Skills approved for use'),
-    _summaryChip('draft', 'Draft', userSkills.length - m.approved, 'Unapproved and archived skills; automatic review handles eligible drafts'),
+    _summaryChip('approved', 'Verified', m.approved, 'Published skills with a passing audit at your confidence threshold'),
+    _summaryChip('draft', 'Needs review', userSkills.length - m.approved, 'Unverified drafts, published skills awaiting a passing audit, and archived skills'),
   ];
   el.innerHTML = chips.join('');
 }
@@ -435,7 +435,7 @@ function _auditModelPills(sk) {
   if (skillNeedsReview(sk, _skillApprovalThreshold)) {
     const model = worker ? ` Last check: ${worker}.` : '';
     const reason = sk.audit_summary ? ` ${sk.audit_summary}` : '';
-    return `<span class="memory-cat-badge skill-model-pill skill-model-student skill-audit-${esc(verdict)}" title="Draft: the previous check did not approve it. Eligible drafts are reviewed automatically.${esc(model + reason)}">draft</span>`;
+    return `<span class="memory-cat-badge skill-model-pill skill-model-student skill-audit-${esc(verdict)}" title="Needs review: the previous check did not verify it. Publication status is separate. Eligible drafts are reviewed automatically.${esc(model + reason)}">needs review</span>`;
   }
   return teacher
     ? `<span class="memory-cat-badge skill-model-pill skill-model-teacher" title="Improved automatically by ${esc(teacher)}">improved</span>`
@@ -727,7 +727,9 @@ function _toggleBuiltinEdit(card, name) {
   ta.value = (card._text != null ? card._text : (pre ? pre.textContent : '')) || '';
   ta.addEventListener('click', (e) => e.stopPropagation());
   if (pre) pre.style.display = 'none';
-  preview.insertBefore(ta, preview.querySelector('.doclib-card-expanded-actions'));
+  const actions = preview.querySelector('.doclib-card-expanded-actions');
+  const editorHost = pre?.parentElement || actions?.parentElement || preview;
+  editorHost.insertBefore(ta, pre ? pre.nextSibling : actions);
   ta.focus();
   const editBtn = [...preview.querySelectorAll('.doclib-card-action-btn')].find(b => /Edit|Save/.test(b.textContent));
   if (editBtn) editBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save';
@@ -1290,7 +1292,9 @@ function _toggleSkillEdit(card, name) {
   ta.value = (card._md != null ? card._md : (pre ? pre.textContent : '')) || '';
   ta.addEventListener('click', (e) => e.stopPropagation());
   if (pre) pre.style.display = 'none';
-  preview.insertBefore(ta, preview.querySelector('.doclib-card-expanded-actions'));
+  const actions = preview.querySelector('.doclib-card-expanded-actions');
+  const editorHost = pre?.parentElement || actions?.parentElement || preview;
+  editorHost.insertBefore(ta, pre ? pre.nextSibling : actions);
   ta.focus();
   // Flip the Edit button label to "Save".
   const editBtn = [...preview.querySelectorAll('.doclib-card-action-btn')].find(b => /Edit|Save/.test(b.textContent));
@@ -1349,7 +1353,7 @@ async function _setSkillStatus(name, status) {
       body: JSON.stringify({ status }),
     });
     await loadSkills();
-    uiModule.showToast(status === 'published' ? 'Skill approved' : 'Skill moved to draft');
+    uiModule.showToast(status === 'published' ? 'Skill published' : 'Skill moved to draft');
   } catch (e) { uiModule.showError('Update failed: ' + e.message); }
 }
 
@@ -1610,7 +1614,7 @@ function _renderTestVerdict(el, v, card, name) {
   const isPub = card && card.dataset && card.dataset.skillStatus === 'published';
   const approveLabel = isPub ? 'Approved' : 'Approve';
   const approveCls = 'skill-eval-approve' + (isPub ? ' is-approved' : (verdict === 'pass' ? ' suggested' : ''));
-  const approveTitle = isPub ? 'Already approved — click to unpublish' : 'Publish — appears in the skills index';
+  const approveTitle = isPub ? 'Published — click to unpublish' : 'Publish — appears in the skills index';
   el.innerHTML =
     '<div class="skill-eval-head"><span class="skill-eval-badge skill-eval-' + cls + '">' + label + (conf ? ' · ' + conf : '') + '</span>' +
     '<span class="skill-eval-summary">' + esc((v && v.summary) || '') + '</span></div>' +
@@ -1635,7 +1639,7 @@ function _renderTestVerdict(el, v, card, name) {
     if (btn) {
       const pub = card.dataset.skillStatus === 'published';
       btn.textContent = pub ? 'Approved' : 'Approve';
-      btn.title = pub ? 'Already approved — click to unpublish' : 'Publish — appears in the skills index';
+      btn.title = pub ? 'Published — click to unpublish' : 'Publish — appears in the skills index';
       btn.classList.toggle('is-approved', pub);
       btn.classList.toggle('suggested', !pub && verdict === 'pass');
     }

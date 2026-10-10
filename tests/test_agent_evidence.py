@@ -934,3 +934,12 @@ def test_exhaustion_and_awaiting_user_are_non_completion_states():
     ledger = EvidenceLedger()
     assert ledger.evaluate(exhausted=True).status == CompletionStatus.EXHAUSTED
     assert ledger.evaluate(awaiting_user=True).status == CompletionStatus.AWAITING_USER
+
+
+def test_model_version_inside_requested_html_text_is_not_an_output_filename():
+    from src.agent_evidence import infer_completion_requirements
+    request = ('In the selected QA workspace, use write_file to create haiku-demo.html: '
+               'standalone HTML with title PIGEON Haiku Demo, h1 Hello PIGEON, '
+               'and paragraph Created by Haiku 5.5. Then use read_file to verify it.')
+    assert infer_completion_requirements(request).required_artifacts == ('haiku-demo.html',)
+    assert infer_completion_requirements('Create file 5.5 in my workspace.').required_artifacts == ('5.5',)

@@ -455,3 +455,19 @@ async def test_slice2_quoted_example_does_not_hide_an_unsupported_report():
     assert 'The docs say "5 passed".' in final
     assert 'I ran pytest' not in final
     assert 'The task is incomplete' not in final
+
+@pytest.mark.asyncio
+async def test_local_budget_block_is_not_presented_as_openai_failure():
+    @with_completion_gate
+    async def stream(messages):
+        yield _event({'delta': 'PIGEON local test budget blocked this request.'})
+        yield 'event: error\ndata: ' + json.dumps({
+            'origin': 'pigeon_budget_guard', 'status': 402,
+            'text': 'No OpenAI generation request was sent.',
+        }) + '\n\n'
+    chunks = [chunk async for chunk in stream([])]
+    final = next(data for event, data in _frames(chunks)
+                 if event == 'message' and data.get('type') == 'final_response')
+    assert 'PIGEON local test budget blocked the next request' in final['content']
+    assert 'Model request failed' not in final['content']
+    assert _decision(chunks)['status'] == 'failed'

@@ -922,7 +922,12 @@ def standalone_code_request(message: str) -> bool:
         # Writing-menu FIND/REPLACE instructions mention HTML tags as source
         # formatting. They do not request a newly created HTML artifact.
         return False
-    if re.search(r'\b(?:repo(?:sitory)?|workspace|directory|folder|filesystem|on disk|terminal)\b|(?:~?/|[A-Za-z]:\\\\)\S+', text, re.I):
+    workspace_reference = re.search(r'\b(?:repo(?:sitory)?|workspace|directory|folder|filesystem|on disk|terminal)\b', text, re.I)
+    path_reference = re.search(
+        r'''(?:^|[\s`"'(=])(?:~?/|[A-Za-z]:[\\/])\S+|\b[\w.-]+(?:/[\w.-]+)+\.[A-Za-z0-9]{1,10}\b''',
+        text,
+    )
+    if workspace_reference or path_reference:
         return False
     if re.search(r'\b(?:using|with|via)\s+(?:bash|shell|python)\b', text, re.I):
         return False
@@ -930,6 +935,9 @@ def standalone_code_request(message: str) -> bool:
         body = re.sub(r'^' + _REQUEST_PREFIX + r'(?:write|create|make|build|generate|implement|code)\s+', '', text, flags=re.I)
         if re.match(r'(?:(?:a|an|the|new|short|brief|simple)\s+)*(?:email|reply|note|task|document|article|explanation|tutorial|example|snippet)\b', body, re.I):
             return False
+        # A filename suffix is an output target, not a language instruction.
+        # "Create output.html" must retain the filesystem artifact contract.
+        body = re.sub(r'\b[\w.-]+\.[A-Za-z0-9]{1,12}\b', '', body)
         return bool(re.search(r'\b(?:code|script|program|game|app|website|webpage|html|svg)\b|\bin\s+(?:python|javascript|typescript|rust|go|java|c\+\+|ruby|php)\b', body, re.I))
     # A format-only reply can complete an artifact request without shell access.
     return bool(re.fullmatch(r'(?:just\s+)?(?:an?\s+)?(?:svg|html)(?:\s+(?:please|instead))?[.!]?', text, re.I))
@@ -1026,6 +1034,18 @@ def selected_tools_for_request(message: str) -> frozenset[str] | None:
     if inline_text_transformation(raw_text):
         return frozenset()
     text = _normalize_request_lead(message)
+    if (
+        re.match(_REQUEST_PREFIX + r'(?:use|call)\s+(?:the\s+)?manage_documents\b', text, re.I)
+        and re.search(r'\b(?:list|read|open|find|search|show)\b', text, re.I)
+        and not re.search(r'\b(?:create|write|edit|update|delete|remove|send|export|execute|run)\b', text, re.I)
+        and not re.search(
+            r'\b(?:and|then)\s+(?:(?:use|call)\s+(?!manage_documents\b)\w+|'
+            r'(?:list|read|open|find|search|show|fetch|browse|check)\b[^.;\n]{0,80}'
+            r'\b(?:web|internet|online|emails?|inbox|notes?|calendar|tasks?|skills?|workspace)\b)',
+            text, re.I,
+        )
+    ):
+        return frozenset({'manage_documents'})
     if re.search(
         r"\bfirst\s+tool\s+call\s+(?:must|should|needs?\s+to)\s+be\s+inspect_media\b",
         raw_text,
@@ -2020,8 +2040,9 @@ def selected_tools_for_request(message: str) -> frozenset[str] | None:
             return frozenset(matched_admin)
     session_noun = r"(?:chats?|sessions?|conversations?)"
     if (
-        re.match(r"^\s*" + _REQUEST_PREFIX + r"(?:create|start|open|make)\b", text, re.I)
-        and re.search(r"\b(?:new|temporary|scratch)?\s*" + session_noun + r"\b", text, re.I)
+        re.match(r"^\s*" + _REQUEST_PREFIX + r"(?:create|start|open|make)\s+"
+                 r"(?:for\s+me\s+|me\s+)?(?:(?:a|an|the|new|temporary|scratch|separate|fresh|research)\s+)*"
+                 + session_noun + r"\b", text, re.I)
     ):
         return frozenset({"create_session"})
     if (
@@ -3008,6 +3029,16 @@ def required_read_operation_for_request(message: str, history: Iterable = ()) ->
     normalized_text = _normalize_request_lead(message)
     text, maximum = _read_request_and_limit(message)
     rows = list(history)
+    if (
+        re.search(r'\bmanage_documents\b', normalized_text, re.I)
+        and re.search(r'\b(?:list|find|search|locate)\b[\s\S]{0,240}'
+                      r'\b(?:then|and)\s+(?:read|open|summari[sz]e|quote)\b',
+                      normalized_text, re.I)
+    ):
+        # Discovery followed by content inspection is not one immutable read.
+        # Let the normal tool loop carry the returned document identity into
+        # the next read rather than terminating after an unfiltered list.
+        return None
     if re.search(
         r"\bwithout\s+(?:using|trusting|relying\s+on)\s+(?:my\s+)?memory\b|"
         r"\b(?:do\s+not|don['’]?t|dont|never)\b[^.;\n]{0,80}\bfrom\s+memory(?:\s+alone)?\b|"
@@ -4772,6 +4803,8 @@ def requested_capabilities(message: str, history: Iterable = (), *, active_docum
         return frozenset({'image_generation'} | ({'documents'} if 'update_document' in image_tools else set()))
     if standalone_code_request(raw_text):
         return frozenset({'documents'})
+    if selected_tools_for_request(raw_text) == frozenset({'manage_documents'}):
+        return frozenset({'documents'})
     repeated_subject = _subject_tokens(text) & _immediate_prior_user_subject_tokens(history)
     scope_text = " ".join(
         token for token in re.findall(r"[\w'-]+", text)
@@ -4921,6 +4954,11 @@ def requested_capabilities(message: str, history: Iterable = (), *, active_docum
         if _bound_editor_requests_web_verification(text):
             families.add("search_browser")
         return frozenset(families)
+    if concrete_urls and selected_tools_for_request(raw_text) == frozenset({"web_fetch"}):
+        # Host/path words such as docs.python.org are a remote target, not
+        # a request to read the editor's private document library. Keep the
+        # capability family consistent with the concrete fetch operation.
+        return frozenset({"search_browser"})
     if (
         re.search(r"\b(?:look\s+at|check|inspect|review|read|open|show|list)\b[^.;\n]{0,180}\bcalendar\b", text, re.I)
         and re.search(

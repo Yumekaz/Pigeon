@@ -175,6 +175,17 @@ def test_client_runtime_context_cannot_bypass_host_shell_approval():
     assert context.decision_for("host_shell", '{"command":"pwd"}').allowed is False
 
 
+@pytest.mark.parametrize('source', ['saved memory: pinned context', 'saved memory: retrieved context', 'available skills index'])
+def test_saved_memory_allows_scoped_reads_but_not_mutations_or_egress(source):
+    context = ToolRunSecurityContext(external_untrusted_context_seen=True, external_sources=[source])
+    assert context.decision_for('manage_documents', '{"action":"list"}').allowed
+    assert not context.decision_for('manage_documents', '{"action":"delete","document_id":"other"}').allowed
+    assert not context.decision_for('host_shell', '{"command":"pwd"}').allowed
+    assert not context.decision_for('api_call', '{"url":"https://example.com"}').allowed
+    context.external_sources.append('web search results')
+    assert not context.decision_for('manage_documents', '{"action":"list"}').allowed
+
+
 @pytest.mark.parametrize(
     "tool_name",
     [

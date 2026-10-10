@@ -8,6 +8,7 @@ import re
 import threading
 import time
 import uuid
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, Tuple
 
@@ -19,6 +20,7 @@ from src.task_action_policy import (
 )
 
 logger = logging.getLogger(__name__)
+_TASK_FOREGROUND = ContextVar('pigeon_task_foreground', default=False)
 
 
 def _is_sft_fixture_owner(owner: str | None) -> bool:
@@ -375,6 +377,7 @@ class TaskScheduler:
         self._run_semaphore = asyncio.Semaphore(1)
         self._concurrency_cap = 1
         self._task_handles = {}
+        self._foreground_tasks = {}
 
     @contextlib.asynccontextmanager
     async def _executing_guard(self):
@@ -819,7 +822,8 @@ class TaskScheduler:
         finally:
             db.close()
 
-    async def _execute_task(self, task_id: str, *, bypass_model_slot: bool = False, release_executing: bool = True):
+    async def _execute_task(self, task_id: str, *, bypass_model_slot: bool = False,
+                            release_executing: bool = True, foreground: bool = False):
         # Create the run record with status="queued" BEFORE waiting on the
         # semaphore so the UI can show that a manually-triggered task is in
         # line behind another. Once we acquire the slot, flip to "running"
@@ -845,13 +849,14 @@ class TaskScheduler:
         finally:
             _q_db.close()
 
+        foreground_token = _TASK_FOREGROUND.set(foreground)
         try:
             if bypass_model_slot or not self._task_needs_model_slot(task_id):
                 await self._execute_task_locked(
                     task_id,
                     run_id,
                     release_executing=release_executing,
-                    gate_foreground=not bypass_model_slot,
+                    gate_foreground=not (bypass_model_slot or foreground),
                 )
                 return
 
@@ -860,7 +865,7 @@ class TaskScheduler:
                     task_id,
                     run_id,
                     release_executing=release_executing,
-                    gate_foreground=True,
+                    gate_foreground=not foreground,
                 )
         except asyncio.CancelledError:
             # If cancellation happens while queued behind the semaphore,
@@ -871,11 +876,18 @@ class TaskScheduler:
             )
             raise
         finally:
+            _TASK_FOREGROUND.reset(foreground_token)
             handle = self._task_handles.get(task_id)
             if handle is current:
                 self._task_handles.pop(task_id, None)
-            if release_executing:
-                async with self._executing_guard():
+            async with self._executing_guard():
+                if foreground:
+                    remaining = self._foreground_tasks.get(task_id, 1) - 1
+                    if remaining > 0:
+                        self._foreground_tasks[task_id] = remaining
+                    else:
+                        self._foreground_tasks.pop(task_id, None)
+                if release_executing:
                     self._executing.discard(task_id)
 
     def _defer_immediately_due_task(self, task_id: str, *, delay: timedelta):
@@ -949,7 +961,7 @@ class TaskScheduler:
             if gate_foreground:
                 waiting = db.query(TaskRun).filter(TaskRun.id == run_id).first()
                 if waiting and waiting.status == "queued":
-                    waiting.result = "Queued — waiting for Odysseus to be idle…"
+                    waiting.result = "Queued — waiting for PIGEON to be idle…"
                     db.commit()
                 from src.interactive_gate import wait_for_interactive_quiet
                 await wait_for_interactive_quiet(f"scheduled task {task.name}")
@@ -2000,7 +2012,8 @@ class TaskScheduler:
         # `(no output)`.
         try:
             from src.interactive_gate import wait_for_interactive_quiet
-            await wait_for_interactive_quiet(f"agent task {task.name}")
+            if not _TASK_FOREGROUND.get():
+                await wait_for_interactive_quiet(f"agent task {task.name}")
             from src.task_endpoint import resolve_task_candidates
             _task_fallbacks = resolve_task_candidates(
                 fallback_url=endpoint_url,
@@ -2028,7 +2041,7 @@ class TaskScheduler:
                 disabled_tools=disabled_tools,
                 relevant_tools=relevant_tools,
                 fallbacks=_task_fallbacks,
-                workload="background",
+                workload="foreground" if _TASK_FOREGROUND.get() else "background",
                 request_authority=request_authority,
         )) as agent_stream:
             async for event_str in agent_stream:
@@ -2381,16 +2394,25 @@ class TaskScheduler:
         except Exception as e:
             logger.error(f"Task {task.id} MCP delivery failed: {e}")
 
-    async def run_task_now(self, task_id: str, *, force: bool = False):
+    async def run_task_now(self, task_id: str, *, force: bool = False, foreground: bool = False):
         """Manually trigger a task execution."""
         if force:
-            asyncio.create_task(self._execute_task(task_id, bypass_model_slot=True, release_executing=False))
+            if foreground:
+                async with self._executing_guard():
+                    self._foreground_tasks[task_id] = self._foreground_tasks.get(task_id, 0) + 1
+            asyncio.create_task(self._execute_task(task_id, bypass_model_slot=True,
+                                release_executing=False, foreground=foreground))
             return True
         async with self._executing_guard():
             if task_id in self._executing:
                 return False
             self._executing.add(task_id)
-        asyncio.create_task(self._execute_task(task_id))
+            if foreground:
+                self._foreground_tasks[task_id] = self._foreground_tasks.get(task_id, 0) + 1
+        if foreground:
+            asyncio.create_task(self._execute_task(task_id, foreground=True))
+        else:
+            asyncio.create_task(self._execute_task(task_id))
         return True
 
     async def stop_task(self, task_id: str) -> bool:
@@ -2416,11 +2438,13 @@ class TaskScheduler:
 
         This is intentionally blunt for scheduled/background work: when the
         user opens or uses Odysseus, foreground interaction wins immediately.
-        Manual force-runs can be restarted by the user; automatic jobs will be
-        deferred by their cancellation path instead of stealing the app.
+        Explicit foreground runs belong to the user's current interaction and
+        remain cancellable through Stop. Automatic jobs defer instead of
+        stealing the app.
         """
         async with self._executing_guard():
-            task_ids = list(self._executing)
+            task_ids = [task_id for task_id in self._executing
+                        if not self._foreground_tasks.get(task_id)]
         stopped = 0
         for task_id in task_ids:
             handle = self._task_handles.get(task_id)

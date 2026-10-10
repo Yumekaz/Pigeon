@@ -33,9 +33,9 @@ def test_skills_summary_surfaces_audit_health_and_quick_filters():
     assert "await _loadSkillApprovalThreshold();" in SKILLS_JS
     assert "skillsSummaryMetrics(userSkills, _skillApprovalThreshold)" in SKILLS_JS
     assert "_summaryChip('all', 'All'" in SKILLS_JS
-    assert "_summaryChip('approved', 'Approved'" in SKILLS_JS
+    assert "_summaryChip('approved', 'Verified'" in SKILLS_JS
     assert "_summaryChip('builtin', 'Built-in'" in SKILLS_JS
-    assert "_summaryChip('draft', 'Draft'" in SKILLS_JS
+    assert "_summaryChip('draft', 'Needs review'" in SKILLS_JS
     summary = SKILLS_JS.split('function _renderSkillsSummary()', 1)[1].split('function _sortSkills', 1)[0]
     assert summary.count('_summaryChip(') == 4
     assert ".skills-summary-chip.active" in STYLE

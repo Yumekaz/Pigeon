@@ -1741,6 +1741,27 @@ def _anthropic_rejects_temperature(model: str) -> bool:
     minor = int(match.group(2)) if match.group(2) else 0
     return (major, minor) >= (4, 7)
 
+
+# Version-gated omission can't cover OpenAI-compatible aggregators: they serve
+# many upstream models behind one endpoint, and some deprecate sampling
+# controls per model (zenmux.ai returns HTTP 400 "`temperature` is deprecated
+# for this model" for claude-haiku-5.5 while the same request with the default
+# temperature succeeds). Enumerating those ids here would silently strip a
+# legitimate field from look-alike models on other providers, so instead the
+# async caller reacts to evidence: only when the upstream's own 400 body names
+# temperature as the problem does it drop the field and retry once. The first
+# attempt stays byte-identical for every healthy endpoint.
+def _temperature_rejected_by_upstream(status_code: int, text: str) -> bool:
+    """Check whether an upstream 400 explicitly blames the temperature field."""
+    if status_code != 400 or not text:
+        return False
+    lowered = text.lower()
+    return "temperature" in lowered and (
+        "deprecated" in lowered
+        or "unsupported" in lowered
+        or "not supported" in lowered
+    )
+
 # Reasoning effort level sent to Mistral thinking-capable models. Mistral's
 # API accepts "high", "medium", "low", "none" — see
 # https://docs.mistral.ai/capabilities/reasoning/. Override via env var
@@ -2771,6 +2792,7 @@ async def llm_call_async(
 
     call_timeout = _call_timeout(timeout)
     attempt = 0
+    temperature_retry_used = False
     while attempt < max_retries:
         attempt += 1
         start = time.time()
@@ -2786,6 +2808,20 @@ async def llm_call_async(
                     f"LLM async call to {target_url} failed in {duration:.2f}s "
                     f"(attempt {attempt}): HTTP {r.status_code} {friendly}"
                 )
+                if (
+                    not temperature_retry_used
+                    and isinstance(payload, dict)
+                    and "temperature" in payload
+                    and _temperature_rejected_by_upstream(r.status_code, r.text)
+                ):
+                    temperature_retry_used = True
+                    payload.pop("temperature", None)
+                    logger.info(
+                        f"{target_url} rejected temperature for {model}; "
+                        f"retrying once without it"
+                    )
+                    attempt -= 1  # the retry is granted, not counted
+                    continue
                 if r.status_code in (429, 502, 503, 504) and attempt < max_retries:
                     await asyncio.sleep(LLMConfig.RETRY_DELAY)
                     continue

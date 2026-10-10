@@ -1992,7 +1992,23 @@ def _recover_empty_session_model(sess, session_id: str, owner: str | None = None
                 return False
         if not visible:
             return False
-        model = visible[0]
+        # Prefer the user's configured default chat model when the endpoint
+        # serves it, so recovery matches what a brand-new chat would pick.
+        # Falling back to visible[0] made recovery nondeterministic: the first
+        # cached model on an aggregator can be one the account cannot actually
+        # use (e.g. balance-gated upstreams), and the session silently switched
+        # to it. Recovery only ever fires when the session model is empty, so
+        # this never overrides an explicit user choice.
+        model = ""
+        try:
+            from src.settings import get_setting
+            _default_model = str(get_setting("default_model") or "").strip()
+            if _default_model and _default_model in {str(item).strip() for item in visible}:
+                model = _default_model
+        except Exception:
+            model = ""
+        if not model:
+            model = visible[0]
         if not isinstance(model, str) or not model.strip():
             return False
         model = model.strip()
@@ -2008,8 +2024,8 @@ def _recover_empty_session_model(sess, session_id: str, owner: str | None = None
             db_session.updated_at = datetime.utcnow()
             db.commit()
         sess.model = model
-        logger.info(
-            "Recovered session model for %s — picked %r from endpoint %s",
+        logger.warning(
+            "Recovered empty session model for %s — composer model changed to %r (endpoint %s) without user action",
             session_id, model, ep.id,
         )
         return True

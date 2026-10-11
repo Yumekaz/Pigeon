@@ -32,7 +32,19 @@ On Windows, use the native launcher:
 powershell -ExecutionPolicy Bypass -File .\launch-windows.ps1
 ```
 
-The launcher prepares dependencies and starts the application on the local address it prints. Follow the first-run account setup. Provider credentials, email accounts, and optional services are configured separately.
+Install Git and Python 3.11+ first (the clean Windows check used Python 3.12).
+The launcher prepares dependencies and starts the application at
+`http://127.0.0.1:7000` by default. On the first interactive launch, choose your
+admin username and password. For later launches, run the same command from this
+folder and keep its terminal open; Ctrl+C stops the server. The launcher checks
+Python dependencies on every run, so it may contact the package registry again.
+
+No frontend build command is needed. Add your cloud provider or local-model
+server in **Settings**. Semantic retrieval needs ChromaDB and embeddings;
+web search needs a configured provider. The native launcher does not start
+those companion services. Email, calendar sync and other integrations have
+their own account/service requirements. Your credentials and data stay local
+and are not included in a clone.
 
 For other platforms and deployment options, see the [setup guide](website/setup.md). Container configurations retain compatible internal identifiers; release images are published separately from source changes.
 
@@ -49,6 +61,9 @@ npm run test:photo-editor
 ```
 
 Use an isolated data directory for tests. Windows runs should use UTF-8. See [test guidance](tests/README.md) for fixtures, focused runs, and external-service prerequisites.
+
+See the [codebase hygiene and fresh-clone check](docs/PIGEON_CODEBASE_HYGIENE.md)
+for clean Windows startup evidence and the remaining reliability improvements.
 
 ## Security
 

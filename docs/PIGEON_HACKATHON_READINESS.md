@@ -136,6 +136,13 @@ rather than claiming they were demonstrated on this computer.
 
 ## Final browser research retest
 
+Later device checkpoint: the user installed PIGEON through Chrome on Windows,
+provided an installed-window screenshot with a working Haiku reply, and confirmed
+Start-menu reopening and retained chat history. Windows online installation and
+reopening are therefore user-verified. Phone installation and offline behavior
+remain unverified; see the [hygiene report](PIGEON_CODEBASE_HYGIENE.md) for the
+service-worker scope finding.
+
 The identical one-round, 80-word fact-check query was repeated on Haiku.
 The actual fetched content now begins with the requested function signature
 and definition rather than the index. Its saved report gives a TRUE verdict,

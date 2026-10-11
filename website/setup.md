@@ -8,18 +8,21 @@ This page keeps the detailed install, deployment, troubleshooting, and configura
 
 ## Quick Start
 
-> **Branch note:** `dev` is the default branch and contains the latest development changes, but it may be unstable. For the more stable curated branch, use [`main`](https://github.com/odysseus-dev/odysseus/tree/main).
+Use this repository's [`main`](https://github.com/Yumekaz/Pigeon/tree/main)
+branch for the shared PIGEON checkout. See the [readiness report](../docs/PIGEON_HACKATHON_READINESS.md)
+for tested workflows and integrations that still need configuration.
 
 Defaults work out of the box: clone, run, then configure models/search/email
 inside **Settings**. Only edit `.env` for deployment-level overrides like
 `APP_BIND`, `APP_PORT`, `AUTH_ENABLED`, `DATABASE_URL`, or a pre-seeded admin password.
 
-On first setup, PIGEON creates an admin account (`admin` unless
-`ODYSSEUS_ADMIN_USER` is set) and prints a temporary password in the terminal.
-For Docker installs, the same line is in `docker compose logs odysseus`.
-Use that for the first login, then change it in **Settings**.
+On interactive native setup, choose your admin username and password when
+prompted (`admin` is the default username). Non-interactive setup generates a
+temporary password unless credentials are pre-seeded. For Docker installs,
+the generated password appears in `docker compose logs odysseus`.
+Use your own first-run credentials, not another machine's demo login.
 
-Contributing? See [CONTRIBUTING.md](https://github.com/odysseus-dev/odysseus/blob/dev/CONTRIBUTING.md) for setup, testing, and pull request guidelines.
+For local development and checks, see [test guidance](../tests/README.md).
 
 ### Docker (recommended)
 ```bash
@@ -30,25 +33,30 @@ docker compose up -d --build
 ```
 To include optional extras in the image (PDF viewer, Office extraction; includes AGPL PyMuPDF), build with `docker compose build --build-arg INSTALL_OPTIONAL=true` before `up`.
 
-**Official Docker images.** The compose files reference the official multi-arch image `ghcr.io/odysseus-dev/odysseus`, which CI (the `ci / docker publish` workflow) publishes on every push to `main` and `dev`. When the image is reachable, Compose pulls it instead of building — so the same files work on hosts without a build toolchain (Portainer stacks, Coolify, etc.). `--build` forces a local build regardless.
+**Source builds and registry images.** The compose file names
+`ghcr.io/yumekaz/pigeon:latest` and also includes a local build. Use the
+`--build` command above when testing this checkout. This repository's image
+publication workflow is manually dispatched; a source push alone does not
+prove a registry image was published or contains your changes.
 
 Tag scheme:
 
 | Tag | Meaning |
 | --- | --- |
-| `:latest`, `:X.Y.Z` | Latest curated build from `main`. **Mutable** — re-pushed on every push to `main`, even without a version bump. |
+| `:latest`, `:X.Y.Z` | Mutable tags produced by a successful manually dispatched publication. Check the package before relying on them. |
 | `:X.Y.Z-<sha>` | Immutable build pin (e.g. `1.0.2-7c8070f`). One tag, one build, forever. **Use this in production.** |
 | `:dev`, `:X.Y.Z-dev.<sha>` | Rolling `dev` branch builds; the `<sha>` form is also immutable. |
 
 For production, pin the immutable tag by overriding the image in `.env` (or the stack's environment variables):
 
 ```bash
-ODYSSEUS_IMAGE=ghcr.io/odysseus-dev/odysseus:1.0.2-7c8070f
+ODYSSEUS_IMAGE="ghcr.io/yumekaz/pigeon:<published-immutable-tag>"
 ```
 
-Browse current tags at <https://github.com/odysseus-dev/odysseus/pkgs/container/odysseus>. (Until this package is made public and linked to the repo by an org owner, pulls fall back to the local build automatically — that fallback is intentional.)
+Only use a tag confirmed in the [PIGEON package](https://github.com/Yumekaz/Pigeon/pkgs/container/pigeon).
+Registry availability and access permissions are separate from a successful source clone.
 
-Open `http://localhost:7000` when the containers are healthy. Docker Compose
+Open `http://localhost:7011` when the containers are healthy. Docker Compose
 binds the web UI to `127.0.0.1` by default. If the port is taken, set
 `APP_PORT=7001` in `.env` and recreate the container. Set `APP_BIND=0.0.0.0`
 only when you intentionally want LAN/reverse-proxy access.
@@ -65,6 +73,7 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python setup.py
+export APP_PORT=7000
 python -m uvicorn app:app --host 127.0.0.1 --port 7000
 ```
 Requirements: Python 3.11+. Cookbook also needs `tmux` for background model
@@ -393,6 +402,7 @@ py -3.11 -m venv venv
 venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python setup.py
+$env:APP_PORT = '7000'
 python -m uvicorn app:app --host 127.0.0.1 --port 7000
 ```
 
@@ -412,15 +422,24 @@ The manual `uvicorn` command takes the same address as `--host 0.0.0.0`. Bind
 outside loopback only for a trusted LAN/VPN such as Tailscale: keep
 `AUTH_ENABLED=true` and do not expose the port directly to the public internet.
 
-**Requirements:** Python 3.11+. The core app (chat, agent, memory, documents,
-email, calendar, deep research) runs fully native. For full **Cookbook** background
+**Requirements:** Python 3.11+ (the clean Windows check used 3.12) and Git to clone
+the repository. Node/npm are not needed to build the frontend; its HTML/CSS/JS
+is served directly. Node/npm are needed for Node-based MCP servers and browser
+tests. The native launcher installs Python dependencies and starts PIGEON;
+it does not start ChromaDB or SearXNG. Semantic memory/personal retrieval needs
+ChromaDB plus an embedding model; web search needs a working provider configured
+in Settings. Docker Compose bundles those services. Email and calendar sync
+still need accounts, and cloud/local chat needs a configured model endpoint.
+
+For full **Cookbook** background
 model downloads and the agent shell tool, also install
 [Git for Windows](https://git-scm.com/download/win) (provides `bash.exe`).
 Local GPU *serving* of vLLM/SGLang needs Linux/WSL2; for a local model on Windows,
 [Ollama](https://ollama.com/download) is the easiest path — point PIGEON at
 `http://localhost:11434/v1` in Settings.
 
-Open `http://localhost:7000`, log in with the generated admin password,
+Open `http://localhost:7000` (or the launcher's printed custom port), log in with
+the credentials you chose during setup,
 and configure everything else inside **Settings**.
 
 ## Troubleshooting & Advanced Setup
@@ -714,7 +733,7 @@ Key settings:
 | `SEARXNG_INSTANCE` | `http://localhost:8080` | SearXNG URL. Docker overrides this to `http://searxng:8080`. |
 | `SEARXNG_SECRET` | generated on first Docker boot | Optional SearXNG cookie/CSRF secret. Leave blank unless you need to pin it. |
 | `APP_BIND` | `127.0.0.1` | Docker Compose host bind address for the web UI. Use `0.0.0.0` only for intentional LAN/reverse-proxy access. |
-| `APP_PORT` | `7000` | Docker Compose host port for the web UI. |
+| `APP_PORT` | `7011` | Docker Compose host port; the native Windows launcher defaults to 7000 and sets APP_PORT from its -Port argument. |
 | `APP_DATA_DIR` | `./data` | Docker Compose host directory for application data volumes. |
 | `APP_LOGS_DIR` | `./logs` | Docker Compose host directory for application logs. |
 | `AUTH_ENABLED` | `true` | Enable/disable login |

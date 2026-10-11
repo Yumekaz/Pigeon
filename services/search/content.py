@@ -8,7 +8,7 @@ import re
 import logging
 from datetime import datetime, timedelta
 from typing import List
-from urllib.parse import urljoin, urlsplit, quote
+from urllib.parse import urljoin, urlsplit, quote, unquote
 
 import httpx
 from bs4 import BeautifulSoup
@@ -175,6 +175,39 @@ def _linked_text(area, base_url: str) -> str:
     return '\n'.join(' '.join(line.split()) for line in area.get_text(' ', strip=False).splitlines() if line.strip())
 
 
+def _fragment_areas(soup, url: str) -> list:
+    """Prioritize an observed section anchor before bounded page excerpts.
+
+    A fragment never causes another fetch. Unknown anchors retain the ordinary
+    page extraction, and only semantic section boundaries are used.
+    """
+    fragment = unquote(urlsplit(url).fragment)
+    if not fragment:
+        return []
+    target = soup.find(id=fragment) or soup.find('a', attrs={'name': fragment})
+    if target is None:
+        return []
+    headings = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']
+    if target.name not in headings + ['dt', 'section', 'article', 'p', 'pre', 'li', 'table']:
+        target = target.find_parent(headings + ['dt', 'p', 'pre', 'li', 'section', 'article'])
+    if target is None:
+        return []
+    if target.name == 'dt':
+        definition = target.find_next_sibling()
+        return [target, definition] if definition and definition.name == 'dd' else [target]
+    if target.name in headings:
+        level = int(target.name[1])
+        areas = [target]
+        for sibling in target.next_siblings:
+            name = getattr(sibling, 'name', None)
+            if name in headings and int(name[1]) <= level:
+                break
+            if name:
+                areas.append(sibling)
+        return areas
+    return [target]
+
+
 def _page_entries(areas, base_url: str) -> list[dict]:
     """Recognize repeated listing structures, retaining DOM order, not popularity."""
     entries = []
@@ -300,7 +333,7 @@ def fetch_webpage_content(url: str, timeout: int = 5, retry_attempt: int = 0,
     effective_cap = min(max_bytes or WEB_FETCH_SOFT_MAX_BYTES, WEB_FETCH_HARD_MAX_BYTES)
     # The cap is part of the cache identity: a truncated soft-cap fetch must
     # not be served to a later full-budget request for the same URL.
-    cache_key = generate_cache_key(f"{url}#cap={effective_cap}#extract=semantic-links-v7")
+    cache_key = generate_cache_key(f"{url}#cap={effective_cap}#extract=semantic-links-v8")
     cache_file = CONTENT_CACHE_DIR / f"{cache_key}.cache"
 
     # Check cache
@@ -541,11 +574,19 @@ def fetch_webpage_content(url: str, timeout: int = 5, retry_attempt: int = 0,
             **_size_fields,
         }
 
+    linked_content = '\n'.join(_linked_text(area, link_base) for area in linked_areas)
+    fragment_areas = _fragment_areas(text_soup, url)
+    if fragment_areas:
+        section_text = '\n'.join(area.get_text(' ', strip=True) for area in fragment_areas)
+        section_links = '\n'.join(_linked_text(area, link_base) for area in fragment_areas)
+        main_content = section_text + '\n\n[Full page follows]\n' + main_content
+        linked_content = section_links + '\n\n[Full page follows]\n' + linked_content
+
     result = {
         "url": url,
         "title": title_text,
         "content": main_content,
-        "linked_content": '\n'.join(_linked_text(area, link_base) for area in linked_areas),
+        "linked_content": linked_content,
         "page_entries": _page_entries(linked_areas, link_base),
         "lists": _extract_lists(soup),
         "tables": _extract_tables(soup),

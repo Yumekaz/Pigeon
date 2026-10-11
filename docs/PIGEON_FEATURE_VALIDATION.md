@@ -1,5 +1,8 @@
 # PIGEON feature validation
 
+Historical report from October 9. See [hackathon readiness](PIGEON_HACKATHON_READINESS.md)
+for the October 10–11 browser repair results, current usage snapshot and remaining gates.
+
 Validated on October 9, 2026. The configured application paths below work in the tested environment. This report does not claim that unconfigured external integrations have been tested live.
 
 ## Results

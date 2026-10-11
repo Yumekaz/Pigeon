@@ -1,5 +1,8 @@
 # PIGEON redesign validation
 
+See [hackathon readiness](PIGEON_HACKATHON_READINESS.md) for the October 10–11
+browser repair results and remaining integration gates. The evidence below is historical.
+
 ## Current feature verification
 
 The October 9 feature pass supersedes the earlier editor and live-service limits below. The complete editor suite now passes **108 tests**, and the authenticated feature suite passes **19 tests**. Live gpt-6-luna chat, owned document reads and approved inline writing suggestions work. The full styled snapshot matches digest `57a46fa4e0697cda`.

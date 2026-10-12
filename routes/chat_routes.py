@@ -2519,6 +2519,15 @@ def setup_chat_routes(
         # below). Skill extraction should only learn from real agent sessions,
         # not chats we quietly promoted for a notes/calendar intent.
         user_requested_agent = (chat_mode == "agent")
+        # Preserve the visible mode's workspace authority even when document,
+        # search or personal-tool intents later promote this turn to Agent.
+        workspace_execution_allowed = (
+            str(form_data.get("workspace_execution", "")).lower() == "true"
+            if form_data.get("workspace_execution") is not None
+            else user_requested_agent
+        )
+        if not workspace_execution_allowed:
+            workspace = None
         _search_enabled = web_search_enabled_for_turn(allow_web_search, use_web)
         _explicit_web_intent = False
         _explicit_personal_store_intent = False
@@ -3742,6 +3751,13 @@ def setup_chat_routes(
             # contract explicitly offers.  User/global denials cannot be
             # restored here because resolve_turn_contract filtered them out.
             disabled_tools.difference_update(_turn_contract.offered)
+            tool_policy = build_effective_tool_policy(
+                disabled_tools=disabled_tools, last_user_message=message,
+            )
+        if not workspace_execution_allowed:
+            from src.agent_loop import _SFT_DISABLED_WORKSPACE_TOOLS
+            disabled_tools.update(_SFT_DISABLED_WORKSPACE_TOOLS | {"bash"})
+            workspace = None
             tool_policy = build_effective_tool_policy(
                 disabled_tools=disabled_tools, last_user_message=message,
             )

@@ -1,4 +1,26 @@
 from src.agent_loop import _classify_agent_request, _is_action_continuation
+from src.agent_loop import _workspace_save_followup
+
+
+def test_named_file_save_followup_retains_workspace_intent():
+    history = [
+        {"role": "user", "content": "Create and save hello-pigeon.html in my workspace."},
+        {"role": "assistant", "content": "The document is open in the editor."},
+        {"role": "user", "content": "try saving"},
+    ]
+    assert _workspace_save_followup("try saving", history, "test-workspace")
+    assert not _workspace_save_followup("try saving", history, None)
+    assert not _workspace_save_followup("why?", history, "test-workspace")
+
+
+def test_save_followup_does_not_infer_file_from_assistant_or_unrelated_task():
+    for previous in ("Save my calendar appointment", "My name is Mihir"):
+        history = [
+            {"role": "user", "content": previous},
+            {"role": "assistant", "content": "Save hello.html"},
+            {"role": "user", "content": "try saving"},
+        ]
+        assert not _workspace_save_followup("try saving", history, "test-workspace")
 
 
 LIVE_TUI_PROMPT = (

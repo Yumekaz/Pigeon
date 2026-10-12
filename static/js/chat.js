@@ -2549,6 +2549,8 @@ import { invalidateSettings } from './appConfig.js';
 	      const toggleState = Storage.loadToggleState();
 	      const isPlanMode = !!toggleState.plan_mode && !(el('research-toggle') && el('research-toggle').checked);
 	      let isAgentMode = (toggleState.mode || 'chat') === 'agent';
+          const workspaceExecutionAllowed = isAgentMode || isPlanMode || !!_pendingApprovedPlan;
+          fd.append('workspace_execution', workspaceExecutionAllowed ? 'true' : 'false');
 	      const isIncognito = isIncognitoForSend;
 	      const _messageText = String(msg || '');
 	      const _explanatoryQuestion = /^\s*(?:how\s+(?:do|can)\s+i|can\s+you\s+explain|what\s+about|tell\s+me\s+how|show\s+me\s+how)\b/i.test(_messageText);
@@ -2563,7 +2565,7 @@ import { invalidateSettings } from './appConfig.js';
 	      if (isPlanMode || _pendingApprovedPlan) {
 	        isAgentMode = true;
 	      }
-	      if (!isAgentMode && workspaceAgentIntent) {
+	      if (!isAgentMode && workspaceAgentIntent && workspaceExecutionAllowed) {
 	        isAgentMode = true;
 	      }
 	      // Auto-escalate to agent mode when a document is open — the user expects
@@ -2600,7 +2602,7 @@ import { invalidateSettings } from './appConfig.js';
         fd.append('incognito', 'true');
       }
       const _ws = (Storage.KEYS && Storage.get(Storage.KEYS.WORKSPACE, '')) || '';
-      if (_ws) {
+      if (_ws && workspaceExecutionAllowed) {
         fd.append('workspace', _ws);
       }
       if (presetsModule.getSelectedPreset()) {

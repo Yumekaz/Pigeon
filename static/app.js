@@ -3383,6 +3383,8 @@ function initializeEventListeners() {
   async function _handleNewChatAction({ preferModel = true, focus = true } = {}) {
       if (!sessionModule) return;
       if (_closeCompareIfActive()) return;
+      const workspaceModule = await import('./js/workspace.js');
+      workspaceModule.setWorkspace('');
       const hasOpenDocument = !!(
         documentModule
         && documentModule.isPanelOpen

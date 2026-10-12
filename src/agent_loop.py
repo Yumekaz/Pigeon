@@ -8800,6 +8800,25 @@ _ACTIONABLE_USER_TARGET_RE = re.compile(
 )
 
 
+def _workspace_save_followup(text, messages, workspace):
+    """Keep file tools for an explicit save follow-up to a named file.
+
+    This only offers tools; workspace confinement, approvals and plan-mode
+    restrictions still apply at execution time.
+    """
+    if not workspace or not re.fullmatch(
+        r"\s*(?:please\s+)?(?:try\s+)?sav(?:e|ing)(?:\s+(?:it|this|that|the file))?(?:\s+(?:again|now))?[.!]?\s*",
+        str(text or ""), re.IGNORECASE,
+    ):
+        return False
+    prior = [m for m in messages if m.get("role") == "user"][:-1][-4:]
+    return any(
+        re.search(r"\b[\w-]+\.(?:html?|css|js|ts|py|txt|md|json)\b", str(m.get("content", "")), re.IGNORECASE)
+        and re.search(r"\b(?:save|write|create|file|workspace|folder)\b", str(m.get("content", "")), re.IGNORECASE)
+        for m in prior
+    )
+
+
 def _looks_like_workspace_coding_request(text: str) -> bool:
     """Best-effort signal for when an active workspace should become code mode.
 
@@ -22551,6 +22570,14 @@ async def stream_agent_loop(
         ):
             _relevant_tools = set(_WORKSPACE_AGENT_TOOLS)
             logger.info("[tool-rag] Workspace file/terminal request; using workspace agent toolset")
+
+    if (
+        not guide_only
+        and _relevant_tools is not None
+        and _workspace_save_followup(_last_user, messages, workspace)
+    ):
+        _relevant_tools.update({"read_file", "write_file", "ls"})
+        logger.info("[tool-rag] Named workspace file save follow-up; retaining file tools")
 
     # If an editor document is open, keep editing tools available regardless of
     # which selection path (RAG, keyword, caller-provided) ran. The prompt also
